@@ -79,14 +79,14 @@ class NIMManager:
             return False
 
         cmd_find_key = self._workbench_cmd_prefix + "grep " + shlex.quote("NGC_API_KEY=" + self._ngc_api_key) + " $HOME/.nv_nim_env"
-        logging.debug("executing " + cmd_find_key)
+        logging.debug("executing grep for NGC_API_KEY in $HOME/.nv_nim_env")
         result = subprocess.run(cmd_find_key, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if result.returncode == 0:
             logging.debug("NGC_API_KEY already exists in $HOME/.nv_nim_env, returning success")
             return True
         else:
             cmd_append_key = self._workbench_cmd_prefix + "awk -i inplace '{ print } ENDFILE { print " + shlex.quote("NGC_API_KEY=" + self._ngc_api_key) + " }' $HOME/.nv_nim_env"
-            logging.debug(cmd_append_key)
+            logging.debug("appending NGC_API_KEY to $HOME/.nv_nim_env")
             result = subprocess.run(cmd_append_key, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if result.returncode == 0:
                 logging.debug("updated NGC_API_KEY in $HOME/.nv_nim_env")
