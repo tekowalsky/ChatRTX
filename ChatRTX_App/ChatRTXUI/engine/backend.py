@@ -82,11 +82,13 @@ class Backend:
             # Set default data directory
             try:
                 dataset_dir = self.config.get_config('dataset/selected_path')
-                dataset_dir = os.path.join(self.root_path, dataset_dir)
+                dataset_dir = os.path.normpath(os.path.join(self.root_path, dataset_dir))
                 if not os.path.isabs(dataset_dir):
                     dataset_dir = os.path.abspath(dataset_dir)
-                else:
-                    dataset_dir = os.path.normpath(dataset_dir)
+                # Ensure resolved path stays within root_path to prevent traversal
+                root_norm = os.path.normpath(self.root_path)
+                if not (dataset_dir == root_norm or dataset_dir.startswith(root_norm + os.sep)):
+                    raise ValueError("Dataset directory is outside the allowed root path")
             except Exception as ds_exc:
                 self._logger.exception(f"Failed to set up dataset directory: {ds_exc}")
                 self._logger.error(f"Failed to set up dataset directory: {ds_exc}")

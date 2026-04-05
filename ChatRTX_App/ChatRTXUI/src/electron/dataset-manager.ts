@@ -37,7 +37,7 @@ import {
 import Equals from './equals'
 import { TRT_LLM_RAG_DIR_PACK } from '../bridge_commands/config-packed'
 import { TRT_LLM_RAG_DIR } from '../bridge_commands/config'
-import { join } from 'path'
+import { join, resolve, sep } from 'path'
 import { existsSync } from 'fs'
 
 const Events = [
@@ -108,12 +108,19 @@ export default class DatasetManager {
         const projectPath = app.isPackaged
             ? TRT_LLM_RAG_DIR_PACK
             : TRT_LLM_RAG_DIR
-        if (
-            path.startsWith(this.datasetInfo.selected_path) ||
-            path.startsWith(projectPath) ||
-            (path.startsWith(programDataPath) && existsSync(path))
-        ) {
-            shell.openPath(path)
+        const resolvedPath = resolve(path)
+        const allowedBases = [
+            resolve(this.datasetInfo.selected_path),
+            resolve(projectPath),
+            resolve(programDataPath),
+        ]
+        const isAllowed = allowedBases.some(
+            (base) =>
+                resolvedPath === base ||
+                resolvedPath.startsWith(base + sep)
+        )
+        if (isAllowed && existsSync(resolvedPath)) {
+            shell.openPath(resolvedPath)
         }
     }
 

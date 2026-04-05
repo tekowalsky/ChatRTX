@@ -77,7 +77,7 @@ class ChatRTX:
                 self.nim_manager = NIMManager.get_instance()
                 ports = []
                 grpc_ports = []
-                print(model_info)
+                self._logger.debug("Initializing NIM with model: %s", model_info.get("id", "unknown"))
                 nim_profile = model_info["nims_id"]
                 self.nim_id = model_info["id"]
                 self._active_nim = nim_profile
@@ -333,6 +333,7 @@ class ChatRTX:
             except Exception as e:
                 self._logger.error(f"Failed to unload the language model: Error {str(e)}")
                 raise Exception(f"Failed to unload the language model: {str(e)}")
+        return False
 
 
     def _load_config(self, file_name):

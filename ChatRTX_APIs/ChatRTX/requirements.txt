@@ -23,7 +23,6 @@ datasets==2.14.6
 rouge_score~=0.1.2
 docx2txt==0.8
 soundfile==0.12.1
-ctype
 ngcsdk==3.57.0
 setuptools==70.0.0
 virtualenv==20.28.1

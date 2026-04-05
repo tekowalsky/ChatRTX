@@ -178,7 +178,7 @@ class ChatBot:
                     self.send_event(successEventName, json.dumps(eventData))
                 else:
                     self.send_event(failureEventName, json.dumps(eventData))
-            except:
+            except Exception:
                 self.send_event(failureEventName, json.dumps(eventData))
 
         t1 = threading.Thread(target=task)
@@ -237,7 +237,7 @@ class ChatBot:
     def send_event(self, eventName: Events, data):
         try:
             self._eventEmitter(eventName.value, data)
-        except:
+        except Exception:
             print("An exception occurred while sending event")
 
     def init_asr_model(self, session_id):

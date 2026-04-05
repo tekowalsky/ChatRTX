@@ -22,6 +22,7 @@
 import ngcsdk
 import json
 import os
+import shlex
 import shutil
 import builtins
 import subprocess
@@ -61,7 +62,11 @@ def execute_command(command):
     """Executes a command in the command line."""
     try:
         # Launch the command and wait for it to finish
-        process = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if isinstance(command, str):
+            args = shlex.split(command)
+        else:
+            args = command
+        process = subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # Decode and print the stdout and stderr from the command
         print(process.stdout.decode())
         print(process.stderr.decode())
