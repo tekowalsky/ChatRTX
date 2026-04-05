@@ -81,7 +81,7 @@ def _ensure_pytorch_rocm():
     except ImportError as exc:
         raise ImportError(
             "The 'transformers' package is required for the pytorch_rocm backend. "
-            "Install it with: pip install transformers>=4.40.0"
+            "Install it with: pip install transformers>=4.48.0"
         ) from exc
 
 
