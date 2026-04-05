@@ -161,11 +161,14 @@ class Backend:
                 if model_info.get("backend") == "nims":
                     hw = detect_hardware()
                     if hw.get("is_ryzen_ai", False):
-                        # On Ryzen AI, pick the first onnxrt model if available
+                        # On Ryzen AI, pick the first onnxrt or gguf model if available
                         models_info = self.model_manager.get_models_info()
                         onnxrt_models = [m for m in models_info if m.get("backend") == "onnxrt"]
+                        gguf_models = [m for m in models_info if m.get("backend") == "gguf"]
                         if onnxrt_models:
                             model_id = onnxrt_models[0]["id"]
+                        elif gguf_models:
+                            model_id = gguf_models[0]["id"]
                         else:
                             model_id = "mistral_7b_AWQ_int4_chat"
                     else:

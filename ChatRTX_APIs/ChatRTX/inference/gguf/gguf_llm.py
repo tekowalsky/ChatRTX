@@ -139,7 +139,8 @@ class GgufLlm:
         # Determine optimal thread count
         n_threads = os.cpu_count() or 4
         if self._is_ryzen_ai_max_plus_395:
-            # Ryzen AI Max+ 395 benefits from more threads on CPU-bound ops
+            # Ryzen AI Max+ 395 benefits from a tuned thread count on CPU-bound
+            # ops; cap at 16 to avoid diminishing returns from context switching.
             n_threads = min(n_threads, 16)
 
         try:
