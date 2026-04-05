@@ -25,14 +25,14 @@ from ChatRTX.chatrtx_rag import ChatRTXRag
 from ChatRTX.logger import ChatRTXLogger
 import logging
 from ChatRTX.model_manager.model_manager import ModelManager
-from ChatRTX.model_manager.verify_model_install import check_nims_support, check_asr_nims_support, is_asr_supported
+from ChatRTX.model_manager.verify_model_install import check_nims_support, check_asr_nims_support, is_asr_supported, is_ryzen_ai
 import sys, os
 from pathlib import Path
 from enum import Enum
 import time
 import random
 from ResponseUtility import getLocalLinksMarkdown, getImagesMarkdown
-from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+from ChatRTX.hardware_detect import detect as detect_hardware, get_available_vram_mb
 import time
 import ctypes
 
@@ -159,7 +159,17 @@ class Backend:
             else:
                 # NIMs are not supported; if the model uses NIMs, switch to a default model_id
                 if model_info.get("backend") == "nims":
-                    model_id = "mistral_7b_AWQ_int4_chat"
+                    hw = detect_hardware()
+                    if hw.get("is_ryzen_ai", False):
+                        # On Ryzen AI, pick the first onnxrt model if available
+                        models_info = self.model_manager.get_models_info()
+                        onnxrt_models = [m for m in models_info if m.get("backend") == "onnxrt"]
+                        if onnxrt_models:
+                            model_id = onnxrt_models[0]["id"]
+                        else:
+                            model_id = "mistral_7b_AWQ_int4_chat"
+                    else:
+                        model_id = "mistral_7b_AWQ_int4_chat"
                     status = self.model_manager.update_active_model(model_id)
 
 
@@ -517,6 +527,12 @@ class Backend:
 
     
     def init_asr_model(self):
+        # ASR via TensorRT is NVIDIA-only
+        hw = detect_hardware()
+        if hw.get("is_ryzen_ai", False):
+            self._logger.info("ASR not supported on AMD Ryzen AI hardware")
+            return False
+
         # initialize transcription model
         from ChatRTX.inference.trtllm.whisper.trt_whisper import WhisperTRTLLM
         asr_engine_path = os.path.join(self.model_setup_dir, 'models', 'whisper', 'whisper_medium_int8_engine')
@@ -524,8 +540,7 @@ class Backend:
         self.enable_asr = True
         if not self.enable_asr:
             return False
-        vid_mem_info = nvmlDeviceGetMemoryInfo(nvmlDeviceGetHandleByIndex(0))
-        free_vid_mem = vid_mem_info.free / (1024*1024)
+        free_vid_mem = get_available_vram_mb()
         print("free video memory in MB = ", free_vid_mem)
         if self.whisper_model is not None:
             self.whisper_model.unload_model()

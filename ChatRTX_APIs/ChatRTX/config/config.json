@@ -246,6 +246,70 @@
                 "isChineseSupported": false,
                 "isEnglishSupported": true,
                 "model_enable_asr": true
+            },
+            {
+                "name": "Mistral 7B ONNX (Ryzen AI)",
+                "id": "mistral_7b_onnx_ryzen_ai",
+                "hf_model_name": "microsoft/Mistral-7B-Instruct-v0.3-ONNX",
+                "backend": "onnxrt",
+                "is_downloaded_required": true,
+                "downloaded": false,
+                "is_installation_required": false,
+                "setup_finished": false,
+                "min_gpu_memory": 8,
+                "should_show_in_UI": false,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": "mistral_7b_onnx_ryzen_ai"
+                },
+                "metadata": {
+                    "max_new_tokens": 1024,
+                    "max_input_token": 4096,
+                    "temperature": 0.1
+                },
+                "model_info": "Mistral 7B optimized for AMD Ryzen AI via ONNX Runtime GenAI with DirectML",
+                "model_license": "https://github.com/mistralai/mistral-src/blob/main/LICENSE",
+                "model_learn_more": "https://huggingface.co/microsoft/Mistral-7B-Instruct-v0.3-ONNX",
+                "model_size": "4GB",
+                "modelDevelopers": "Mistral AI / Microsoft",
+                "isTextBased": true,
+                "isImageBased": false,
+                "isChineseSupported": false,
+                "isEnglishSupported": true,
+                "model_enable_asr": false,
+                "ryzen_ai_optimized": true
+            },
+            {
+                "name": "Phi-3 Mini ONNX (Ryzen AI)",
+                "id": "phi3_mini_onnx_ryzen_ai",
+                "hf_model_name": "microsoft/Phi-3-mini-4k-instruct-onnx",
+                "backend": "onnxrt",
+                "is_downloaded_required": true,
+                "downloaded": false,
+                "is_installation_required": false,
+                "setup_finished": false,
+                "min_gpu_memory": 4,
+                "should_show_in_UI": false,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": "phi3_mini_onnx_ryzen_ai"
+                },
+                "metadata": {
+                    "max_new_tokens": 1024,
+                    "max_input_token": 4096,
+                    "temperature": 0.1
+                },
+                "model_info": "Phi-3 Mini optimized for AMD Ryzen AI via ONNX Runtime GenAI with DirectML",
+                "model_license": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/blob/main/LICENSE",
+                "model_learn_more": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx",
+                "model_size": "2.4GB",
+                "modelDevelopers": "Microsoft",
+                "isTextBased": true,
+                "isImageBased": false,
+                "isChineseSupported": false,
+                "isEnglishSupported": true,
+                "model_enable_asr": false,
+                "ryzen_ai_optimized": true
             }
         ],
         "selected": "meta/llama-3.1-8b-instruct",

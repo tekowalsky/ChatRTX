@@ -284,7 +284,11 @@ class TrtLlmAPI(CustomLLM):
             del self._model
             self._model = None  # Ensure the reference is cleaned up after deletion.
 
-        torch.cuda.empty_cache()
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
         gc.collect()
 
     @property

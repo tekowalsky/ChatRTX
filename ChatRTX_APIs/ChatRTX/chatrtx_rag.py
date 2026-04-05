@@ -31,6 +31,15 @@ from ChatRTX.logger import ChatRTXLogger
 import shutil
 import logging
 
+
+def _safe_cuda_empty_cache():
+    """Empty CUDA cache only when CUDA is actually available."""
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
 class ChatRTXRag:
     """
     Manages operations on language models including initialization, and response generation.
@@ -94,11 +103,23 @@ class ChatRTXRag:
                 self.use_nims = True
                 return True
             else:
+                if backend == "onnxrt":
+                    from ChatRTX.rags.llama_index.ort_genai_api import OrtGenaiAPI
+                    self.use_nims = False
+                    model_path = os.path.join(self._model_directory, model_info["id"])
+                    self._llm = OrtGenaiAPI(
+                        model_path=model_path,
+                        temperature=model_info["metadata"].get("temperature", 0.1),
+                        max_new_tokens=model_info["metadata"].get("max_new_tokens", 1024),
+                        context_window=model_info["metadata"].get("max_input_token", 4096),
+                    )
+                    return True
+
                 # Find the model information in the internal map using the provided model_id
                 from ChatRTX.rags.llama_index.trtllm_api import TrtLlmAPI
                 from ChatRTX.inference.trtllm.utils import (read_model_name)
                 if backend != "TRTLLM":
-                    raise ValueError(f"Unsupported backend '{backend}'. Currently, only 'TRTLLM' is supported.")
+                    raise ValueError(f"Unsupported backend '{backend}'. Supported backends: 'TRTLLM', 'onnxrt', 'nims'.")
 
                 self.use_nims = False
                 model_path = os.path.join(self._model_directory, model_info["id"], ChatRTXRag.ENGINE_DIR)
@@ -211,7 +232,7 @@ class ChatRTXRag:
                 index = load_index_from_storage(storage_context=storage_context)
             else:
                 self._logger.info("Generating new values")
-                torch.cuda.empty_cache()
+                _safe_cuda_empty_cache()
                 gc.collect()
                 documents = self._load_documents(folder_path)
 
@@ -227,7 +248,7 @@ class ChatRTXRag:
             query_engine = index.as_query_engine(streaming=streaming,
                                                  similarity_top_k=self._app_config_info["similarity_top_k"])
             self._logger.debug("Query engine generated successfully.")
-            torch.cuda.empty_cache()
+            _safe_cuda_empty_cache()
             gc.collect()
             return query_engine
 
@@ -281,7 +302,7 @@ class ChatRTXRag:
         self._logger.debug("Generating response for query: %s", query)
         try:
             response = query_engine.query(query)
-            torch.cuda.empty_cache()
+            _safe_cuda_empty_cache()
             gc.collect()
             self._logger.debug("Response generated successfully.")
             return response
@@ -322,9 +343,8 @@ class ChatRTXRag:
                 self._llm = None
                 del self._embedding_model
                 self._embedding_model = None
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    self._logger.info("CUDA cache cleared.")
+                _safe_cuda_empty_cache()
+                self._logger.info("GPU cache cleared.")
 
                 # Invoke garbage collection
                 gc.collect()
