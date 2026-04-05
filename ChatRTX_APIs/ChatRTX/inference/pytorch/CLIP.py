@@ -43,7 +43,8 @@ class CLIPEmbeddingStorageEngine:
             self.index = None
             self.nodes = None
             os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            from ChatRTX.hardware_detect import get_torch_device
+            self.device = get_torch_device()
             self.model_path = model_path
             self.clip_model = clip_model
             self.clip_processor = clip_processor
@@ -90,7 +91,8 @@ class CLIPEmbeddingStorageEngine:
             else:
                 self.index = VectorStoreIndex(self.nodes)
                 self.index.storage_context.persist(persist_dir=self.persist_dir)
-                torch.cuda.empty_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 gc.collect()
             self.retriever = self.index.as_retriever(similarity_top_k=500)
             return True
@@ -163,7 +165,9 @@ class ClipInference:
     def load_model(self, model_path):
         self.model_path = model_path
         try:
-            self.clip_model = CLIPModel.from_pretrained(self.model_path).to('cuda')
+            from ChatRTX.hardware_detect import get_torch_device
+            device = get_torch_device()
+            self.clip_model = CLIPModel.from_pretrained(self.model_path).to(device)
             self.clip_processor = CLIPProcessor.from_pretrained(self.model_path)
             return True
         except Exception as e:

@@ -85,12 +85,13 @@ const CodeBlock = ({
                     type="copy-clipboard"
                     tooltip={t('copyCode')}
                     onClick={() => {
-                        const tempDivElement = document.createElement('div')
-                        tempDivElement.innerHTML = codeText
+                        const parser = new DOMParser()
+                        const doc = parser.parseFromString(
+                            codeText || '',
+                            'text/html'
+                        )
                         navigator.clipboard.writeText(
-                            tempDivElement.textContent ||
-                                tempDivElement.innerText ||
-                                ''
+                            doc.body.textContent || ''
                         )
                     }}
                     className="copy-clipboard-code"

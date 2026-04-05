@@ -53,6 +53,8 @@ class Events(Enum):
     MODEL_DOWNLOADED = 'MODEL_DOWNLOADED'
     MODEL_INSTALLED = 'MODEL_INSTALLED'
     MODEL_DELETED = 'MODEL_DELETED'
+    HF_MODEL_ADDED = 'HF_MODEL_ADDED'
+    HF_MODEL_ADD_ERROR = 'HF_MODEL_ADD_ERROR'
     ON_DATASET_UPDATE = 'ON_DATASET_UPDATE'
     ON_DATASET_UPDATE_ERROR = 'ON_DATASET_UPDATE_ERROR'
     ON_INDEX_REGENERATED = 'ON_DATA_REGENERATED'
@@ -176,7 +178,7 @@ class ChatBot:
                     self.send_event(successEventName, json.dumps(eventData))
                 else:
                     self.send_event(failureEventName, json.dumps(eventData))
-            except:
+            except Exception:
                 self.send_event(failureEventName, json.dumps(eventData))
 
         t1 = threading.Thread(target=task)
@@ -235,7 +237,7 @@ class ChatBot:
     def send_event(self, eventName: Events, data):
         try:
             self._eventEmitter(eventName.value, data)
-        except:
+        except Exception:
             print("An exception occurred while sending event")
 
     def init_asr_model(self, session_id):
@@ -266,6 +268,12 @@ class ChatBot:
         self._handle_with_condition(lambda: self.backend.delete_model(model_id), Events.MODEL_DELETED,
                                     Events.MODEL_DELETE_ERROR, model_id)
         return True
+
+    def add_hf_model(self, repo_id, session_id):
+        assert self.session_id == session_id
+        self._logger.info(f"Adding HF model: {repo_id}")
+        return self._handle_with_condition(lambda: self.backend.add_hf_model(repo_id), Events.HF_MODEL_ADDED,
+                                    Events.HF_MODEL_ADD_ERROR, repo_id)
 
     def get_dataset_info(self, session_id):
         assert self.session_id == session_id

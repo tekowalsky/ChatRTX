@@ -25,14 +25,14 @@ from ChatRTX.chatrtx_rag import ChatRTXRag
 from ChatRTX.logger import ChatRTXLogger
 import logging
 from ChatRTX.model_manager.model_manager import ModelManager
-from ChatRTX.model_manager.verify_model_install import check_nims_support, check_asr_nims_support, is_asr_supported
+from ChatRTX.model_manager.verify_model_install import check_nims_support, check_asr_nims_support, is_asr_supported, is_ryzen_ai
 import sys, os
 from pathlib import Path
 from enum import Enum
 import time
 import random
 from ResponseUtility import getLocalLinksMarkdown, getImagesMarkdown
-from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+from ChatRTX.hardware_detect import detect as detect_hardware, get_available_vram_mb
 import time
 import ctypes
 
@@ -82,11 +82,13 @@ class Backend:
             # Set default data directory
             try:
                 dataset_dir = self.config.get_config('dataset/selected_path')
-                dataset_dir = os.path.join(self.root_path, dataset_dir)
+                dataset_dir = os.path.normpath(os.path.join(self.root_path, dataset_dir))
                 if not os.path.isabs(dataset_dir):
                     dataset_dir = os.path.abspath(dataset_dir)
-                else:
-                    dataset_dir = os.path.normpath(dataset_dir)
+                # Ensure resolved path stays within root_path to prevent traversal
+                root_norm = os.path.normpath(self.root_path)
+                if not (dataset_dir == root_norm or dataset_dir.startswith(root_norm + os.sep)):
+                    raise ValueError("Dataset directory is outside the allowed root path")
             except Exception as ds_exc:
                 self._logger.exception(f"Failed to set up dataset directory: {ds_exc}")
                 self._logger.error(f"Failed to set up dataset directory: {ds_exc}")
@@ -159,7 +161,23 @@ class Backend:
             else:
                 # NIMs are not supported; if the model uses NIMs, switch to a default model_id
                 if model_info.get("backend") == "nims":
-                    model_id = "mistral_7b_AWQ_int4_chat"
+                    hw = detect_hardware()
+                    if hw.get("is_ryzen_ai", False):
+                        # On Ryzen AI, pick the first pytorch_rocm, onnxrt, or gguf model if available
+                        models_info = self.model_manager.get_models_info()
+                        rocm_models = [m for m in models_info if m.get("backend") == "pytorch_rocm"]
+                        onnxrt_models = [m for m in models_info if m.get("backend") == "onnxrt"]
+                        gguf_models = [m for m in models_info if m.get("backend") == "gguf"]
+                        if rocm_models and hw.get("has_rocm", False):
+                            model_id = rocm_models[0]["id"]
+                        elif onnxrt_models:
+                            model_id = onnxrt_models[0]["id"]
+                        elif gguf_models:
+                            model_id = gguf_models[0]["id"]
+                        else:
+                            model_id = "mistral_7b_AWQ_int4_chat"
+                    else:
+                        model_id = "mistral_7b_AWQ_int4_chat"
                     status = self.model_manager.update_active_model(model_id)
 
 
@@ -453,7 +471,11 @@ class Backend:
                 model_id == "gemma_7b_int4" or
                 model_id == "meta/llama-3.1-8b-instruct" or
                 model_id == "mistral-nemo-12b-instruct" or
-                model_id == "meta/llama-3.2-3b-instruct"
+                model_id == "meta/llama-3.2-3b-instruct" or
+                model_id == "mistral_7b_instruct_q4_gguf" or
+                model_id == "llama_3_1_8b_instruct_q4_gguf" or
+                model_id == "mistral_7b_instruct_rocm" or
+                model_id == "llama_3_1_8b_instruct_rocm"
             ):
                 dataset = self.config.get_config('dataset/path')
             elif model_id == "chatglm3_6b_AWQ_int4":
@@ -469,6 +491,11 @@ class Backend:
     def delete_model(self, model_id):
         status = self.model_manager.delete_model(model_id)
         self._logger.info(f"Delete model return {status}")
+        return status
+
+    def add_hf_model(self, repo_id):
+        status = self.model_manager.add_hf_model(repo_id)
+        self._logger.info(f"Add HF model {repo_id} returned {status}")
         return status
 
     def set_active_model(self, model_id):
@@ -512,6 +539,12 @@ class Backend:
 
     
     def init_asr_model(self):
+        # ASR via TensorRT is NVIDIA-only
+        hw = detect_hardware()
+        if hw.get("is_ryzen_ai", False):
+            self._logger.info("ASR not supported on AMD Ryzen AI hardware")
+            return False
+
         # initialize transcription model
         from ChatRTX.inference.trtllm.whisper.trt_whisper import WhisperTRTLLM
         asr_engine_path = os.path.join(self.model_setup_dir, 'models', 'whisper', 'whisper_medium_int8_engine')
@@ -519,8 +552,7 @@ class Backend:
         self.enable_asr = True
         if not self.enable_asr:
             return False
-        vid_mem_info = nvmlDeviceGetMemoryInfo(nvmlDeviceGetHandleByIndex(0))
-        free_vid_mem = vid_mem_info.free / (1024*1024)
+        free_vid_mem = get_available_vram_mb()
         print("free video memory in MB = ", free_vid_mem)
         if self.whisper_model is not None:
             self.whisper_model.unload_model()

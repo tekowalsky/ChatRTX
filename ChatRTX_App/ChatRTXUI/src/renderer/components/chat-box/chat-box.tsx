@@ -221,16 +221,13 @@ export default function ChatBox({ isDrawerOpen }: { isDrawerOpen?: boolean }) {
                                                 type="copy-clipboard"
                                                 tooltip={t('copyToClipboard')}
                                                 onClick={() => {
-                                                    const tempDivElement =
-                                                        document.createElement(
-                                                            'div'
-                                                        )
-                                                    tempDivElement.innerHTML =
-                                                        item.response
+                                                    const parser = new DOMParser()
+                                                    const doc = parser.parseFromString(
+                                                        item.response || '',
+                                                        'text/html'
+                                                    )
                                                     navigator.clipboard.writeText(
-                                                        tempDivElement.textContent ||
-                                                            tempDivElement.innerText ||
-                                                            ''
+                                                        doc.body.textContent || ''
                                                     )
                                                 }}
                                             ></CustomIconButton>

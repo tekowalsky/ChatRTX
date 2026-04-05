@@ -22,15 +22,15 @@
 import json
 import os
 import math
-from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 import subprocess
 import logging
+from ChatRTX.hardware_detect import detect as detect_hardware, get_total_system_memory_gb
 
 # Configure logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Set of GPUs that support NIMs (using trimmed IDs as integers)
+# Set of NVIDIA GPUs that support NIMs (using trimmed IDs as integers)
 gpu_ids_for_nims = {0x2684, 0x2704, 0x26B1, 0x2B85, 0x2C02}
 gpu_ids_for_blackwell = {0x2B85, 0x2C02}
 gpu_ids_for_ars_nims = {0x2684, 0x2704, 0x26B1, 0x2B85, 0x2C02}
@@ -39,10 +39,15 @@ gpu_ids_where_ars_diabled = {} # where no asr model supported (nothing for now)
 def get_host_gpu_device_id():
     """
     Retrieves and trims the GPU device ID of the host using nvidia-smi by ignoring the last four characters.
+    Returns None on AMD Ryzen AI systems (nvidia-smi is not available).
 
     Returns:
         int or None: Trimmed GPU device ID as an integer, or None if retrieval fails.
     """
+    hw = detect_hardware()
+    if hw["vendor"] != "nvidia":
+        return None
+
     try:
         cmd = [
             "nvidia-smi",
@@ -79,7 +84,20 @@ def get_host_gpu_device_id():
         return None
 
 
+def is_ryzen_ai():
+    """Return True when running on AMD Ryzen AI hardware."""
+    return detect_hardware().get("is_ryzen_ai", False)
+
+
+def is_ryzen_ai_max_plus_395():
+    """Return True when running on AMD Ryzen AI Max+ 395."""
+    return detect_hardware().get("is_ryzen_ai_max_plus_395", False)
+
+
 def check_nims_support():
+    # NIMs are NVIDIA-specific — never supported on AMD Ryzen AI
+    if is_ryzen_ai():
+        return False
     host_gpu_id = get_host_gpu_device_id()
     if host_gpu_id is None:
         return False
@@ -89,6 +107,9 @@ def check_nims_support():
         return False
 
 def is_asr_supported():
+    # ASR via TensorRT or NIM is NVIDIA-specific
+    if is_ryzen_ai():
+        return False
     host_gpu_id = get_host_gpu_device_id()
     if host_gpu_id is None:
         return False
@@ -97,9 +118,10 @@ def is_asr_supported():
         return False
     else:
         return True
-    pass
 
 def check_asr_nims_support():
+    if is_ryzen_ai():
+        return False
     host_gpu_id = get_host_gpu_device_id()
     if host_gpu_id is None:
         return False
@@ -190,9 +212,20 @@ def update_config(models_dir, config_path):
         if not config:
             return
 
-        nvmlInit()
-        vid_mem_info = nvmlDeviceGetMemoryInfo(nvmlDeviceGetHandleByIndex(0))
-        total_vid_mem = math.ceil(vid_mem_info.total / (1024 * 1024 * 1024))
+        hw = detect_hardware()
+        on_ryzen_ai = hw.get("is_ryzen_ai", False)
+
+        if on_ryzen_ai:
+            # On Ryzen AI systems we use system RAM instead of discrete VRAM
+            total_vid_mem = get_total_system_memory_gb()
+        else:
+            try:
+                from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+                nvmlInit()
+                vid_mem_info = nvmlDeviceGetMemoryInfo(nvmlDeviceGetHandleByIndex(0))
+                total_vid_mem = math.ceil(vid_mem_info.total / (1024 * 1024 * 1024))
+            except Exception:
+                total_vid_mem = 0
 
         host_gpu_id = get_host_gpu_device_id()
 
@@ -206,16 +239,39 @@ def update_config(models_dir, config_path):
                 if not isinstance(min_gpu_memory, int):
                     logger.error(f"Error: min_gpu_memory is not an integer for model {model.get('id', 'unknown')}.")
                     continue
-                if min_gpu_memory > total_vid_mem:
-                    model['should_show_in_UI'] = False
-                elif (is_nim_supported and model['backend'] == "nims"):
-                    model['should_show_in_UI'] = True
-                elif is_nim_supported == False and model['backend'] == "nims":
-                    model['should_show_in_UI'] = False
-                elif (is_blackwell_gpu and (model['backend'] == "TRTLLM")):
-                    model['should_show_in_UI'] = False
+                backend = model.get('backend', '')
+
+                if on_ryzen_ai:
+                    # On Ryzen AI: show onnxrt, pytorch, gguf, and pytorch_rocm models;
+                    # hide TRTLLM and nims
+                    if backend in ("onnxrt", "pytorch", "gguf", "pytorch_rocm"):
+                        if min_gpu_memory > total_vid_mem:
+                            model['should_show_in_UI'] = False
+                        else:
+                            model['should_show_in_UI'] = True
+                    else:
+                        model['should_show_in_UI'] = False
                 else:
-                    model['should_show_in_UI'] = True
+                    # Original NVIDIA logic
+                    if min_gpu_memory > total_vid_mem:
+                        model['should_show_in_UI'] = False
+                    elif (is_nim_supported and backend == "nims"):
+                        model['should_show_in_UI'] = True
+                    elif is_nim_supported == False and backend == "nims":
+                        model['should_show_in_UI'] = False
+                    elif (is_blackwell_gpu and (backend == "TRTLLM")):
+                        model['should_show_in_UI'] = False
+                    elif backend == "onnxrt":
+                        # onnxrt models are AMD-only, hide on NVIDIA
+                        model['should_show_in_UI'] = False
+                    elif backend == "pytorch_rocm":
+                        # pytorch_rocm models are AMD ROCm-only, hide on NVIDIA
+                        model['should_show_in_UI'] = False
+                    elif backend == "gguf":
+                        # GGUF models run on both NVIDIA and AMD — always show
+                        model['should_show_in_UI'] = True
+                    else:
+                        model['should_show_in_UI'] = True
 
             # Update model properties for 'supported' models
             for model in config['models']['supported']:
