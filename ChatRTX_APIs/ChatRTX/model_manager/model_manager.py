@@ -23,7 +23,7 @@ import json
 import logging
 import os.path
 import shutil
-from ChatRTX.model_manager.model_manager_util import download_model_by_name, build_engine_by_name, verify_clip_checksum
+from ChatRTX.model_manager.model_manager_util import download_model_by_name, build_engine_by_name, verify_clip_checksum, hf_repo_id_to_model_id
 from ChatRTX.model_manager.verify_model_install import update_config
 from ChatRTX.logger import ChatRTXLogger
 from ChatRTX.model_manager.config import Config
@@ -258,6 +258,91 @@ class ModelManager:
             self._logger.error(f"Error while verifying checksum for {model_id}. Error: {str(e)}")
             return False
 
+    def _download_gguf_model(self, model_info):
+        """
+        Downloads a GGUF model file from Hugging Face Hub.
+
+        Args:
+            model_info (dict): Model configuration dictionary.
+
+        Returns:
+            bool: True if the download was successful, False otherwise.
+        """
+        try:
+            from huggingface_hub import hf_hub_download
+
+            hf_repo = model_info.get("hf_model_name")
+            gguf_filename = model_info.get("gguf_filename")
+            model_id = model_info["id"]
+
+            if not hf_repo or not gguf_filename:
+                self._logger.error(
+                    f"GGUF model {model_id} missing hf_model_name or gguf_filename in config."
+                )
+                return False
+
+            local_dir = os.path.join(self._model_directory, model_id)
+            os.makedirs(local_dir, exist_ok=True)
+
+            self._logger.info(
+                f"Downloading GGUF file {gguf_filename} from {hf_repo} to {local_dir}"
+            )
+            hf_hub_download(
+                repo_id=hf_repo,
+                filename=gguf_filename,
+                local_dir=local_dir,
+            )
+            self._logger.info(f"GGUF model {model_id} downloaded successfully.")
+            return True
+        except Exception as e:
+            self._logger.error(
+                f"Failed to download GGUF model {model_info.get('id', 'unknown')}. Error: {str(e)}"
+            )
+            return False
+
+    def _download_pytorch_rocm_model(self, model_info):
+        """
+        Downloads a HuggingFace model for PyTorch ROCm inference.
+
+        Uses ``huggingface_hub.snapshot_download`` to clone the full model
+        repository (config, tokenizer, weights) into the local model directory.
+
+        Args:
+            model_info (dict): Model configuration dictionary.
+
+        Returns:
+            bool: True if the download was successful, False otherwise.
+        """
+        try:
+            from huggingface_hub import snapshot_download
+
+            hf_repo = model_info.get("hf_model_name")
+            model_id = model_info["id"]
+
+            if not hf_repo:
+                self._logger.error(
+                    f"PyTorch ROCm model {model_id} missing hf_model_name in config."
+                )
+                return False
+
+            local_dir = os.path.join(self._model_directory, model_id)
+            os.makedirs(local_dir, exist_ok=True)
+
+            self._logger.info(
+                f"Downloading PyTorch ROCm model {hf_repo} to {local_dir}"
+            )
+            snapshot_download(
+                repo_id=hf_repo,
+                local_dir=local_dir,
+            )
+            self._logger.info(f"PyTorch ROCm model {model_id} downloaded successfully.")
+            return True
+        except Exception as e:
+            self._logger.error(
+                f"Failed to download PyTorch ROCm model {model_info.get('id', 'unknown')}. Error: {str(e)}"
+            )
+            return False
+
     def download_model(self, model_id):
         """
         Downloads the specified model.
@@ -280,6 +365,12 @@ class ModelManager:
                 return False
             if model_info['backend'] == "TRTLLM" or model_info['backend'] == "pytorch":
                 status = download_model_by_name(model_info, self._model_directory)
+            elif model_info['backend'] == "gguf":
+                status = self._download_gguf_model(model_info)
+            elif model_info['backend'] == "onnxrt":
+                status = download_model_by_name(model_info, self._model_directory)
+            elif model_info['backend'] == "pytorch_rocm":
+                status = self._download_pytorch_rocm_model(model_info)
             else:
                 self._logger.info(f"Downloading NIM {model_id}")
                 nim_id = model_info["nims_id"]
@@ -337,6 +428,28 @@ class ModelManager:
                         self._logger.error(f"{model_id} file corrupted.")
                         return False
                 status = build_engine_by_name(model_info=model_info, download_path=self._model_directory)
+            elif model_info['backend'] == "gguf":
+                # GGUF models don't require a separate engine build step;
+                # they are ready to use once the .gguf file is downloaded.
+                model_dir = os.path.join(self._model_directory, model_id)
+                if os.path.isdir(model_dir):
+                    import glob
+                    gguf_files = glob.glob(os.path.join(model_dir, "**", "*.gguf"), recursive=True)
+                    status = len(gguf_files) > 0
+                    if not status:
+                        self._logger.error(f"No .gguf file found in {model_dir}")
+                else:
+                    self._logger.error(f"Model directory {model_dir} does not exist.")
+                    status = False
+            elif model_info['backend'] == "onnxrt":
+                # ONNX Runtime models are ready after download
+                model_dir = os.path.join(self._model_directory, model_id)
+                status = os.path.isdir(model_dir)
+            elif model_info['backend'] == "pytorch_rocm":
+                # PyTorch ROCm models are ready after download (HuggingFace
+                # format, no engine build required)
+                model_dir = os.path.join(self._model_directory, model_id)
+                status = os.path.isdir(model_dir)
             else:
                 self._logger.info(f"Installing NIM {model_id}")
                 nim_id = model_info.get("nims_id")
@@ -495,3 +608,67 @@ class ModelManager:
     def update_data_directory_path(self, dataset_dir: str):
         self.config.write_default_config('dataset/selected_path', dataset_dir)
         return True
+
+    def add_hf_model(self, repo_id):
+        """
+        Adds a Hugging Face model to the supported models configuration.
+
+        Args:
+            repo_id (str): The Hugging Face model repository ID (e.g., 'meta-llama/Llama-2-7b').
+
+        Returns:
+            bool: True if the model was added successfully, False otherwise.
+        """
+        try:
+            from huggingface_hub import model_info as hf_model_info
+
+            info = hf_model_info(repo_id)
+
+            model_id = hf_repo_id_to_model_id(repo_id)
+
+            model_info_list = self.config.get_config('models/supported')
+            if any(m['id'] == model_id for m in model_info_list):
+                self._logger.info(f"Model {repo_id} already exists in config.")
+                return True
+
+            author = getattr(info, 'author', None)
+            if not author and "/" in repo_id:
+                author = repo_id.split("/")[0]
+            if not author:
+                author = "Unknown"
+
+            model_entry = {
+                "name": repo_id,
+                "id": model_id,
+                "hf_model_name": repo_id,
+                "backend": "pytorch",
+                "is_downloaded_required": True,
+                "downloaded": False,
+                "is_installation_required": False,
+                "setup_finished": False,
+                "min_gpu_memory": 8,
+                "should_show_in_UI": True,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": model_id
+                },
+                "metadata": {},
+                "model_info": f"Hugging Face model: {repo_id}",
+                "model_license": f"https://huggingface.co/{repo_id}",
+                "model_learn_more": f"https://huggingface.co/{repo_id}",
+                "model_size": "Unknown",
+                "modelDevelopers": author,
+                "isTextBased": True,
+                "isImageBased": False,
+                "isChineseSupported": False,
+                "isEnglishSupported": True,
+                "model_enable_asr": False
+            }
+
+            model_info_list.append(model_entry)
+            self.config.write_default_config('models/supported', model_info_list)
+            self._logger.info(f"Successfully added HF model {repo_id} to config.")
+            return True
+        except Exception as e:
+            self._logger.error(f"Failed to add HF model {repo_id}. Error: {str(e)}")
+            return False
