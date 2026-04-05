@@ -20,12 +20,15 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
+from html import escape
 
 def getLocalLinksMarkdown(localPathList):
     innerHtml = ''
     for path in localPathList:
         tail = os.path.split(path)[1]
-        innerHtml += f'''<a data-link='{path}'>{tail}</a>'''
+        safe_path = escape(str(path), quote=True)
+        safe_tail = escape(str(tail))
+        innerHtml += f'''<a data-link='{safe_path}'>{safe_tail}</a>'''
 
     return f'''<div class="links-list">{innerHtml}</div>'''
 
@@ -33,6 +36,7 @@ def getLocalLinksMarkdown(localPathList):
 def getImagesMarkdown(localImagePathList):
     innerHtml = ''
     for path in localImagePathList:
-        innerHtml += f'''<a data-link='{path}'><img data-link='{path}'></a>'''
+        safe_path = escape(str(path), quote=True)
+        innerHtml += f'''<a data-link='{safe_path}'><img data-link='{safe_path}'></a>'''
     
     return f'''<div class="images-list">{innerHtml}</div>'''

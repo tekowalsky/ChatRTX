@@ -21,6 +21,7 @@
 
 
 import time
+import shlex
 import subprocess
 import os
 import requests
@@ -77,14 +78,14 @@ class NIMManager:
             logging.debug("could not touch $HOME/.nv_nim_env")
             return False
 
-        cmd_find_key = self._workbench_cmd_prefix + "grep \"NGC_API_KEY=" + self._ngc_api_key + "\" $HOME/.nv_nim_env"
+        cmd_find_key = self._workbench_cmd_prefix + "grep " + shlex.quote("NGC_API_KEY=" + self._ngc_api_key) + " $HOME/.nv_nim_env"
         logging.debug("executing " + cmd_find_key)
         result = subprocess.run(cmd_find_key, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if result.returncode == 0:
             logging.debug("NGC_API_KEY already exists in $HOME/.nv_nim_env, returning success")
             return True
         else:
-            cmd_append_key = self._workbench_cmd_prefix + "awk -i inplace '{ print } ENDFILE { print \"NGC_API_KEY=" + self._ngc_api_key + "\" }' $HOME/.nv_nim_env"
+            cmd_append_key = self._workbench_cmd_prefix + "awk -i inplace '{ print } ENDFILE { print " + shlex.quote("NGC_API_KEY=" + self._ngc_api_key) + " }' $HOME/.nv_nim_env"
             logging.debug(cmd_append_key)
             result = subprocess.run(cmd_append_key, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if result.returncode == 0:
@@ -97,9 +98,9 @@ class NIMManager:
     def _login_to_ngc_registry(self):
         key = os.environ.get('NGC_API_KEY_TEMP')
         if key:
-            self._logger.warn("Using the API key from the environment variable instead of calling API")
+            self._logger.warning("Using the API key from the environment variable instead of calling API")
         else:
-            self._logger.warn("NGC_API_KEY_TEMP env var not found, generating key")
+            self._logger.warning("NGC_API_KEY_TEMP env var not found, generating key")
             deviceInfoNvml = self._get_key.get_device_info_nvml()
             key = self._get_key.get_ngc_key(deviceInfoNvml)
 
@@ -186,7 +187,7 @@ class NIMManager:
                 prereq_1_cmdline += src_dir
 
                 prereq_2_cmdline = self._workbench_cmd_prefix
-                prereq_2_cmdline += 'chmod 777 -R '
+                prereq_2_cmdline += 'chmod 755 -R '
                 prereq_2_cmdline += src_dir
 
             if nim['env_0']:
@@ -429,7 +430,7 @@ class NIMManager:
                 http_ports.append(nim_cmds['http_ports_out'])
             if nim_cmds['grpc_ports_out']:
                 grpc_ports.append(nim_cmds['grpc_ports_out'])
-            logging.warn("NIM is already running, nothing to do, returning with success")
+            logging.warning("NIM is already running, nothing to do, returning with success")
             return True
 
         if self.is_installed(nim_id) == False:
