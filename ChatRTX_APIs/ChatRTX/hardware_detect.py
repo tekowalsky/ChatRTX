@@ -30,16 +30,17 @@ import logging
 import os
 import platform
 import subprocess
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Internal cached state
 # ---------------------------------------------------------------------------
-_detected: dict | None = None
+_detected: Optional[Dict] = None
 
 
-def _run_cmd(cmd: list[str]) -> str | None:
+def _run_cmd(cmd: list) -> Optional[str]:
     """Run a command and return stripped stdout, or None on failure."""
     try:
         result = subprocess.run(
@@ -54,7 +55,7 @@ def _run_cmd(cmd: list[str]) -> str | None:
         return None
 
 
-def _detect_nvidia_gpu() -> dict | None:
+def _detect_nvidia_gpu() -> Optional[Dict]:
     """Try to detect an NVIDIA GPU via nvidia-smi."""
     output = _run_cmd(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"])
     if output is None:
@@ -70,7 +71,7 @@ def _detect_nvidia_gpu() -> dict | None:
     return {"name": name, "vram_mb": vram_mb}
 
 
-def _detect_amd_ryzen_ai() -> dict | None:
+def _detect_amd_ryzen_ai() -> Optional[Dict]:
     """
     Detect AMD Ryzen AI hardware.
 
