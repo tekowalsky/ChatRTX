@@ -310,6 +310,70 @@
                 "isEnglishSupported": true,
                 "model_enable_asr": false,
                 "ryzen_ai_optimized": true
+            },
+            {
+                "name": "Mistral 7B Instruct Q4 GGUF",
+                "id": "mistral_7b_instruct_q4_gguf",
+                "hf_model_name": "TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
+                "gguf_filename": "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
+                "backend": "gguf",
+                "is_downloaded_required": true,
+                "downloaded": false,
+                "is_installation_required": false,
+                "setup_finished": false,
+                "min_gpu_memory": 4,
+                "should_show_in_UI": true,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": "mistral_7b_instruct_q4_gguf"
+                },
+                "metadata": {
+                    "max_new_tokens": 1024,
+                    "max_input_token": 7168,
+                    "temperature": 0.1
+                },
+                "model_info": "Mistral 7B Instruct v0.2 in Q4_K_M GGUF format. Runs on both NVIDIA (CUDA) and AMD (Vulkan/CPU) hardware.",
+                "model_license": "https://github.com/mistralai/mistral-src/blob/main/LICENSE",
+                "model_learn_more": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
+                "model_size": "4.4GB",
+                "modelDevelopers": "Mistral AI",
+                "isTextBased": true,
+                "isImageBased": false,
+                "isChineseSupported": false,
+                "isEnglishSupported": true,
+                "model_enable_asr": false
+            },
+            {
+                "name": "Llama 3.1 8B Instruct Q4 GGUF",
+                "id": "llama_3_1_8b_instruct_q4_gguf",
+                "hf_model_name": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+                "gguf_filename": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+                "backend": "gguf",
+                "is_downloaded_required": true,
+                "downloaded": false,
+                "is_installation_required": false,
+                "setup_finished": false,
+                "min_gpu_memory": 6,
+                "should_show_in_UI": true,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": "llama_3_1_8b_instruct_q4_gguf"
+                },
+                "metadata": {
+                    "max_new_tokens": 1024,
+                    "max_input_token": 4096,
+                    "temperature": 0.1
+                },
+                "model_info": "Meta Llama 3.1 8B Instruct in Q4_K_M GGUF format. Runs on both NVIDIA (CUDA) and AMD (Vulkan/CPU) hardware.",
+                "model_license": "https://ai.meta.com/llama/license/",
+                "model_learn_more": "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+                "model_size": "4.9GB",
+                "modelDevelopers": "Meta",
+                "isTextBased": true,
+                "isImageBased": false,
+                "isChineseSupported": false,
+                "isEnglishSupported": true,
+                "model_enable_asr": false
             }
         ],
         "selected": "meta/llama-3.1-8b-instruct",
@@ -341,7 +405,9 @@
                 "llama2_13b_AWQ_INT4_chat",
                 "gemma_7b_int4",
                 "meta/llama-3.1-8b-instruct",
-                "mistral-nemo-12b-instruct"
+                "mistral-nemo-12b-instruct",
+                "mistral_7b_instruct_q4_gguf",
+                "llama_3_1_8b_instruct_q4_gguf"
             ],
             "dataset_path": "%programdata%\\NVIDIA Corporation\\ChatRTX\\sample_data\\dataset",
             "isRelative": true,

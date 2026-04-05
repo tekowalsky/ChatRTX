@@ -258,6 +258,48 @@ class ModelManager:
             self._logger.error(f"Error while verifying checksum for {model_id}. Error: {str(e)}")
             return False
 
+    def _download_gguf_model(self, model_info):
+        """
+        Downloads a GGUF model file from Hugging Face Hub.
+
+        Args:
+            model_info (dict): Model configuration dictionary.
+
+        Returns:
+            bool: True if the download was successful, False otherwise.
+        """
+        try:
+            from huggingface_hub import hf_hub_download
+
+            hf_repo = model_info.get("hf_model_name")
+            gguf_filename = model_info.get("gguf_filename")
+            model_id = model_info["id"]
+
+            if not hf_repo or not gguf_filename:
+                self._logger.error(
+                    f"GGUF model {model_id} missing hf_model_name or gguf_filename in config."
+                )
+                return False
+
+            local_dir = os.path.join(self._model_directory, model_id)
+            os.makedirs(local_dir, exist_ok=True)
+
+            self._logger.info(
+                f"Downloading GGUF file {gguf_filename} from {hf_repo} to {local_dir}"
+            )
+            hf_hub_download(
+                repo_id=hf_repo,
+                filename=gguf_filename,
+                local_dir=local_dir,
+            )
+            self._logger.info(f"GGUF model {model_id} downloaded successfully.")
+            return True
+        except Exception as e:
+            self._logger.error(
+                f"Failed to download GGUF model {model_info.get('id', 'unknown')}. Error: {str(e)}"
+            )
+            return False
+
     def download_model(self, model_id):
         """
         Downloads the specified model.
@@ -279,6 +321,10 @@ class ModelManager:
                 self._logger.error(f"Model {model_id} not found.")
                 return False
             if model_info['backend'] == "TRTLLM" or model_info['backend'] == "pytorch":
+                status = download_model_by_name(model_info, self._model_directory)
+            elif model_info['backend'] == "gguf":
+                status = self._download_gguf_model(model_info)
+            elif model_info['backend'] == "onnxrt":
                 status = download_model_by_name(model_info, self._model_directory)
             else:
                 self._logger.info(f"Downloading NIM {model_id}")
@@ -337,6 +383,23 @@ class ModelManager:
                         self._logger.error(f"{model_id} file corrupted.")
                         return False
                 status = build_engine_by_name(model_info=model_info, download_path=self._model_directory)
+            elif model_info['backend'] == "gguf":
+                # GGUF models don't require a separate engine build step;
+                # they are ready to use once the .gguf file is downloaded.
+                model_dir = os.path.join(self._model_directory, model_id)
+                if os.path.isdir(model_dir):
+                    import glob
+                    gguf_files = glob.glob(os.path.join(model_dir, "**", "*.gguf"), recursive=True)
+                    status = len(gguf_files) > 0
+                    if not status:
+                        self._logger.error(f"No .gguf file found in {model_dir}")
+                else:
+                    self._logger.error(f"Model directory {model_dir} does not exist.")
+                    status = False
+            elif model_info['backend'] == "onnxrt":
+                # ONNX Runtime models are ready after download
+                model_dir = os.path.join(self._model_directory, model_id)
+                status = os.path.isdir(model_dir)
             else:
                 self._logger.info(f"Installing NIM {model_id}")
                 nim_id = model_info.get("nims_id")

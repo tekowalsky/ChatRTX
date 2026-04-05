@@ -463,7 +463,9 @@ class Backend:
                 model_id == "gemma_7b_int4" or
                 model_id == "meta/llama-3.1-8b-instruct" or
                 model_id == "mistral-nemo-12b-instruct" or
-                model_id == "meta/llama-3.2-3b-instruct"
+                model_id == "meta/llama-3.2-3b-instruct" or
+                model_id == "mistral_7b_instruct_q4_gguf" or
+                model_id == "llama_3_1_8b_instruct_q4_gguf"
             ):
                 dataset = self.config.get_config('dataset/path')
             elif model_id == "chatglm3_6b_AWQ_int4":
