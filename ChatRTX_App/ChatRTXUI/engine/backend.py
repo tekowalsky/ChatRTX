@@ -88,7 +88,7 @@ class Backend:
                 # Ensure resolved path stays within root_path to prevent traversal
                 root_norm = os.path.normpath(self.root_path)
                 if not (dataset_dir == root_norm or dataset_dir.startswith(root_norm + os.sep)):
-                    raise ValueError(f"Dataset directory {dataset_dir} is outside the allowed root path")
+                    raise ValueError("Dataset directory is outside the allowed root path")
             except Exception as ds_exc:
                 self._logger.exception(f"Failed to set up dataset directory: {ds_exc}")
                 self._logger.error(f"Failed to set up dataset directory: {ds_exc}")
