@@ -471,6 +471,11 @@ class Backend:
         self._logger.info(f"Delete model return {status}")
         return status
 
+    def add_hf_model(self, repo_id):
+        status = self.model_manager.add_hf_model(repo_id)
+        self._logger.info(f"Add HF model {repo_id} returned {status}")
+        return status
+
     def set_active_model(self, model_id):
         try:
             self.chatrtx.unload_llm()

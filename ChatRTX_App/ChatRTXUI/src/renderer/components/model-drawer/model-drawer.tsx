@@ -28,9 +28,12 @@ import ModelCard from '../model-card/model-card'
 import { ModelDetails, ModelId } from '../../../electron/types'
 import {
     Backdrop,
+    Box,
+    Button,
     CircularProgress,
     Snackbar,
     Stack,
+    TextField,
     Typography,
 } from '@mui/material'
 import { themeSettings } from '../../theme/theme'
@@ -67,6 +70,10 @@ export default function ModelDrawer({
     const [modelDeleteUnderProgress, setModelDeleteUnderProgress] =
         useState<string>(null)
     const [toastMessage, setToastMessage] = useState<string>(null)
+
+    const [hfRepoId, setHfRepoId] = useState<string>('')
+    const [hfModelAddInProgress, setHfModelAddInProgress] =
+        useState<boolean>(false)
 
     const { t } = useTranslation()
 
@@ -157,6 +164,29 @@ export default function ModelDrawer({
             }
         )
 
+        const hfModelAddedListener = clientAPI.onHfModelAdded((repoId) => {
+            setHfModelAddInProgress(false)
+            setHfRepoId('')
+            setToastMessage(
+                t('hfModelAddSuccess', {
+                    defaultValue: `Model ${repoId} added successfully`,
+                    repoId,
+                })
+            )
+        })
+
+        const hfModelAddErrorListener = clientAPI.onHfModelAddError(
+            (repoId) => {
+                setHfModelAddInProgress(false)
+                setToastMessage(
+                    t('hfModelAddError', {
+                        defaultValue: `Failed to add model ${repoId}`,
+                        repoId,
+                    })
+                )
+            }
+        )
+
         return () => {
             supportedModelListener()
             datasetchangeListener()
@@ -168,6 +198,8 @@ export default function ModelDrawer({
             modelInstallErrorListener()
             modelDeleteListener()
             modelDeleteErrorListener()
+            hfModelAddedListener()
+            hfModelAddErrorListener()
         }
     }, [])
 
@@ -206,12 +238,88 @@ export default function ModelDrawer({
         setToastMessage(null)
     }
 
+    const onAddHfModelClick = () => {
+        const trimmed = hfRepoId.trim()
+        if (!trimmed || !trimmed.includes('/')) {
+            setToastMessage(
+                t('hfModelInvalidId', {
+                    defaultValue:
+                        'Please enter a valid Hugging Face model ID (e.g., meta-llama/Llama-2-7b)',
+                })
+            )
+            return
+        }
+        setHfModelAddInProgress(true)
+        clientAPI.addHfModel(trimmed)
+    }
+
     return (
         <CustomDrawer
             drawerHeader={t('selectAIModel')}
             openDrawer={openDrawer}
             onDrawerClosed={onDrawerClosed}
         >
+            <Box sx={{ padding: '16px', marginBottom: '8px' }}>
+                <Typography
+                    variant="body2"
+                    sx={{ marginBottom: '8px', color: 'rgba(255, 255, 255, 0.7)' }}
+                >
+                    {t('addHfModelLabel', {
+                        defaultValue: 'Add a model from Hugging Face',
+                    })}
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                        size="small"
+                        placeholder="owner/model-name"
+                        value={hfRepoId}
+                        onChange={(e) => setHfRepoId(e.target.value)}
+                        disabled={hfModelAddInProgress}
+                        sx={{
+                            flex: 1,
+                            '& .MuiInputBase-input': {
+                                color: 'rgba(255, 255, 255, 0.9)',
+                                fontSize: '14px',
+                            },
+                            '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                },
+                                '&:hover fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.5)',
+                                },
+                                '&.Mui-focused fieldset': {
+                                    borderColor: themeSettings.colors.brand,
+                                },
+                            },
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                onAddHfModelClick()
+                            }
+                        }}
+                    />
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={onAddHfModelClick}
+                        disabled={hfModelAddInProgress || !hfRepoId.trim()}
+                        sx={{
+                            backgroundColor: themeSettings.colors.brand,
+                            textTransform: 'none',
+                            '&:hover': {
+                                backgroundColor: themeSettings.colors.brandLight,
+                            },
+                        }}
+                    >
+                        {hfModelAddInProgress ? (
+                            <CircularProgress size={20} color="inherit" />
+                        ) : (
+                            t('addModel', { defaultValue: 'Add' })
+                        )}
+                    </Button>
+                </Stack>
+            </Box>
             {supportedModels.map((modelDetails: ModelDetails) => (
                 <div key={modelDetails.id}>
                     <ModelCard

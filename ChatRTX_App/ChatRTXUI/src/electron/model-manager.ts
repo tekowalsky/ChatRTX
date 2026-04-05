@@ -24,6 +24,8 @@ import { BrowserWindow, ipcMain } from 'electron'
 import {
     ACTIVE_MODEL_UPDATE,
     ACTIVE_MODEL_UPDATE_ERROR,
+    HF_MODEL_ADDED,
+    HF_MODEL_ADD_ERROR,
     MODEL_DELETED,
     MODEL_DELETE_ERROR,
     MODEL_DOWNLOADED,
@@ -47,6 +49,8 @@ const Events = [
     MODEL_DOWNLOADED,
     MODEL_INSTALLED,
     MODEL_DELETED,
+    HF_MODEL_ADDED,
+    HF_MODEL_ADD_ERROR,
     ON_PYTHON_ENGINE_INIT,
     ON_PYTHON_ENGINE_INIT_ERROR,
 ] as const
@@ -173,6 +177,9 @@ export default class ModelManager {
         ipcMain.handle('installModel', (_event, id: ModelId) =>
             this.installModel(id)
         )
+        ipcMain.handle('addHfModel', (_event, repoId: string) =>
+            this.addHfModel(repoId)
+        )
         this.handlePythonEvents()
     }
 
@@ -195,6 +202,7 @@ export default class ModelManager {
             case MODEL_DOWNLOADED:
             case MODEL_INSTALLED:
             case MODEL_DELETED:
+            case HF_MODEL_ADDED:
                 this.getModelInfo()
                 this.emit(eventName, data as ModelId)
                 break
@@ -202,6 +210,7 @@ export default class ModelManager {
             case MODEL_DOWNLOAD_ERROR:
             case MODEL_INSTALL_ERROR:
             case MODEL_DELETE_ERROR:
+            case HF_MODEL_ADD_ERROR:
                 this.emit(eventName, data as ModelId)
         }
     }
@@ -293,6 +302,18 @@ export default class ModelManager {
             .catch((error) => {
                 console.log('Error for deleteModel call ', error)
                 this.emit(MODEL_DELETE_ERROR, id)
+            })
+    }
+
+    private addHfModel = (repoId: string) => {
+        this._chatBot
+            .addHfModel(repoId)
+            .then((value) => {
+                console.log('addHfModel call returned ', value)
+            })
+            .catch((error) => {
+                console.log('Error for addHfModel call ', error)
+                this.emit(HF_MODEL_ADD_ERROR, repoId)
             })
     }
 }

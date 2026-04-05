@@ -294,6 +294,15 @@ def check_checkpoints_checksum(checkpoints_path, checkpoints, mode_id, checkpoin
         return False
 
 
+def download_hf_model_snapshot(repo_id, download_path):
+    """Downloads a complete model from Hugging Face Hub using snapshot_download."""
+    from huggingface_hub import snapshot_download
+    local_dir = os.path.join(download_path, repo_id.replace("/", "_"))
+    os.makedirs(local_dir, exist_ok=True)
+    snapshot_download(repo_id=repo_id, local_dir=local_dir)
+    return True
+
+
 def download_model_by_name(model_info, download_path):
     status = False
     os.environ['NGC_CLI_API_URL'] = 'https://api.ngc.nvidia.com'
@@ -322,20 +331,27 @@ def download_model_by_name(model_info, download_path):
 
         # Code to build the engine here
     elif 'hf_model_name' in model_info and model_info['hf_model_name']:
-        model_setup_path = os.path.join(download_path, model_info['id'])
-        os.makedirs(model_setup_path, exist_ok=True)
-        checkpoints_files = model_info['prerequisite']['checkpoints_files']
-        download_link = model_info['download_link']
-        status = True
-        for file in checkpoints_files:
-            url = download_link + "/" + file + "?download=true"
-            destination = os.path.join(model_setup_path, file)
-            print(f"URL to download is {url}")
+        checkpoints_files = model_info.get('prerequisite', {}).get('checkpoints_files', [])
+        download_link = model_info.get('download_link', '')
+        if checkpoints_files and download_link:
+            model_setup_path = os.path.join(download_path, model_info['id'])
+            os.makedirs(model_setup_path, exist_ok=True)
+            status = True
+            for file in checkpoints_files:
+                url = download_link + "/" + file + "?download=true"
+                destination = os.path.join(model_setup_path, file)
+                print(f"URL to download is {url}")
+                try:
+                    download_file(url, destination)
+                    print(f"Download successful for the file {file}")
+                except Exception as e:
+                    logger.error(f"Download failed for the file {file}. Error: {e}")
+                    status = False
+        else:
             try:
-                download_file(url, destination)
-                print(f"Download successful for the file {file}")
+                status = download_hf_model_snapshot(model_info['hf_model_name'], download_path)
             except Exception as e:
-                logger.error(f"Download failed for the file {file}. Error: {e}")
+                logger.error(f"Download failed for HF model {model_info['hf_model_name']}. Error: {e}")
                 status = False
 
     if status == False:

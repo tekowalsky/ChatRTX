@@ -495,3 +495,63 @@ class ModelManager:
     def update_data_directory_path(self, dataset_dir: str):
         self.config.write_default_config('dataset/selected_path', dataset_dir)
         return True
+
+    def add_hf_model(self, repo_id):
+        """
+        Adds a Hugging Face model to the supported models configuration.
+
+        Args:
+            repo_id (str): The Hugging Face model repository ID (e.g., 'meta-llama/Llama-2-7b').
+
+        Returns:
+            bool: True if the model was added successfully, False otherwise.
+        """
+        try:
+            from huggingface_hub import model_info as hf_model_info
+
+            info = hf_model_info(repo_id)
+
+            model_id = repo_id.replace("/", "_")
+
+            model_info_list = self.config.get_config('models/supported')
+            if any(m['id'] == model_id for m in model_info_list):
+                self._logger.info(f"Model {repo_id} already exists in config.")
+                return True
+
+            author = getattr(info, 'author', None) or repo_id.split("/")[0] if "/" in repo_id else "Unknown"
+
+            model_entry = {
+                "name": repo_id,
+                "id": model_id,
+                "hf_model_name": repo_id,
+                "backend": "pytorch",
+                "is_downloaded_required": True,
+                "downloaded": False,
+                "is_installation_required": False,
+                "setup_finished": False,
+                "min_gpu_memory": 8,
+                "should_show_in_UI": True,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": model_id
+                },
+                "metadata": {},
+                "model_info": f"Hugging Face model: {repo_id}",
+                "model_license": f"https://huggingface.co/{repo_id}",
+                "model_learn_more": f"https://huggingface.co/{repo_id}",
+                "model_size": "Unknown",
+                "modelDevelopers": author,
+                "isTextBased": True,
+                "isImageBased": False,
+                "isChineseSupported": False,
+                "isEnglishSupported": True,
+                "model_enable_asr": False
+            }
+
+            model_info_list.append(model_entry)
+            self.config.write_default_config('models/supported', model_info_list)
+            self._logger.info(f"Successfully added HF model {repo_id} to config.")
+            return True
+        except Exception as e:
+            self._logger.error(f"Failed to add HF model {repo_id}. Error: {str(e)}")
+            return False

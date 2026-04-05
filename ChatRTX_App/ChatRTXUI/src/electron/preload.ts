@@ -50,6 +50,8 @@ import {
     ON_DATASET_UPDATE_ERROR,
     ON_DATASET_UPDATE,
     APP_SHUTTINGDOWN,
+    HF_MODEL_ADDED,
+    HF_MODEL_ADD_ERROR,
 } from './constants'
 
 const makeListener = (eventName: string, callback: (data: any) => void) => {
@@ -125,6 +127,12 @@ export const ClientAPI = {
         makeListener(MODEL_DELETE_ERROR, callback),
     onModelDeleted: (callback: (modelId: ModelId) => void): (() => void) =>
         makeListener(MODEL_DELETED, callback),
+    addHfModel: (repoId: string) =>
+        ipcRenderer.invoke('addHfModel', repoId),
+    onHfModelAdded: (callback: (repoId: string) => void): (() => void) =>
+        makeListener(HF_MODEL_ADDED, callback),
+    onHfModelAddError: (callback: (repoId: string) => void): (() => void) =>
+        makeListener(HF_MODEL_ADD_ERROR, callback),
 
     /**FINE TUNNING */
     // parentId refers to the modelId of parent under which fine tuning is shown
