@@ -115,10 +115,22 @@ class ChatRTX:
                     )
                     return True
 
+                if backend_type == "pytorch_rocm":
+                    from ChatRTX.inference.pytorch_rocm.rocm_llm import RocmLlm
+                    self.use_nims = False
+                    model_path = os.path.join(self._model_directory, model_info["id"])
+                    self._llm = RocmLlm(
+                        model_path=model_path,
+                        temperature=model_info["metadata"].get("temperature", 0.1),
+                        max_new_tokens=model_info["metadata"].get("max_new_tokens", 1024),
+                        context_window=model_info["metadata"].get("max_input_token", 4096),
+                    )
+                    return True
+
                 from ChatRTX.inference.trtllm.trtllm import TrtLlm
                 if backend != "TRTLLM":
-                    self._logger.error(f"Unsupported backend '%s'. Supported backends: 'TRTLLM', 'onnxrt', 'gguf', 'nims'.", backend)
-                    raise ValueError(f"Unsupported backend '{backend}'. Supported backends: 'TRTLLM', 'onnxrt', 'gguf', 'nims'.")
+                    self._logger.error(f"Unsupported backend '%s'. Supported backends: 'TRTLLM', 'onnxrt', 'gguf', 'pytorch_rocm', 'nims'.", backend)
+                    raise ValueError(f"Unsupported backend '{backend}'. Supported backends: 'TRTLLM', 'onnxrt', 'gguf', 'pytorch_rocm', 'nims'.")
                 self.use_nims = False
                 # Construct paths for model components
                 model_path = os.path.join(self._model_directory, model_info["id"], ChatRTX.ENGINE_DIR)

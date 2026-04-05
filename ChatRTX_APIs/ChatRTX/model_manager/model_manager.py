@@ -300,6 +300,49 @@ class ModelManager:
             )
             return False
 
+    def _download_pytorch_rocm_model(self, model_info):
+        """
+        Downloads a HuggingFace model for PyTorch ROCm inference.
+
+        Uses ``huggingface_hub.snapshot_download`` to clone the full model
+        repository (config, tokenizer, weights) into the local model directory.
+
+        Args:
+            model_info (dict): Model configuration dictionary.
+
+        Returns:
+            bool: True if the download was successful, False otherwise.
+        """
+        try:
+            from huggingface_hub import snapshot_download
+
+            hf_repo = model_info.get("hf_model_name")
+            model_id = model_info["id"]
+
+            if not hf_repo:
+                self._logger.error(
+                    f"PyTorch ROCm model {model_id} missing hf_model_name in config."
+                )
+                return False
+
+            local_dir = os.path.join(self._model_directory, model_id)
+            os.makedirs(local_dir, exist_ok=True)
+
+            self._logger.info(
+                f"Downloading PyTorch ROCm model {hf_repo} to {local_dir}"
+            )
+            snapshot_download(
+                repo_id=hf_repo,
+                local_dir=local_dir,
+            )
+            self._logger.info(f"PyTorch ROCm model {model_id} downloaded successfully.")
+            return True
+        except Exception as e:
+            self._logger.error(
+                f"Failed to download PyTorch ROCm model {model_info.get('id', 'unknown')}. Error: {str(e)}"
+            )
+            return False
+
     def download_model(self, model_id):
         """
         Downloads the specified model.
@@ -326,6 +369,8 @@ class ModelManager:
                 status = self._download_gguf_model(model_info)
             elif model_info['backend'] == "onnxrt":
                 status = download_model_by_name(model_info, self._model_directory)
+            elif model_info['backend'] == "pytorch_rocm":
+                status = self._download_pytorch_rocm_model(model_info)
             else:
                 self._logger.info(f"Downloading NIM {model_id}")
                 nim_id = model_info["nims_id"]
@@ -398,6 +443,11 @@ class ModelManager:
                     status = False
             elif model_info['backend'] == "onnxrt":
                 # ONNX Runtime models are ready after download
+                model_dir = os.path.join(self._model_directory, model_id)
+                status = os.path.isdir(model_dir)
+            elif model_info['backend'] == "pytorch_rocm":
+                # PyTorch ROCm models are ready after download (HuggingFace
+                # format, no engine build required)
                 model_dir = os.path.join(self._model_directory, model_id)
                 status = os.path.isdir(model_dir)
             else:

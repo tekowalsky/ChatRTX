@@ -374,6 +374,70 @@
                 "isChineseSupported": false,
                 "isEnglishSupported": true,
                 "model_enable_asr": false
+            },
+            {
+                "name": "Mistral 7B Instruct ROCm (Ryzen AI)",
+                "id": "mistral_7b_instruct_rocm",
+                "hf_model_name": "mistralai/Mistral-7B-Instruct-v0.3",
+                "backend": "pytorch_rocm",
+                "is_downloaded_required": true,
+                "downloaded": false,
+                "is_installation_required": false,
+                "setup_finished": false,
+                "min_gpu_memory": 8,
+                "should_show_in_UI": false,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": "mistral_7b_instruct_rocm"
+                },
+                "metadata": {
+                    "max_new_tokens": 1024,
+                    "max_input_token": 7168,
+                    "temperature": 0.1
+                },
+                "model_info": "Mistral 7B Instruct v0.3 running natively on AMD Ryzen AI via PyTorch ROCm. Optimized for Ryzen AI Max+ 395 with fp16 precision.",
+                "model_license": "https://github.com/mistralai/mistral-src/blob/main/LICENSE",
+                "model_learn_more": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+                "model_size": "14.5GB",
+                "modelDevelopers": "Mistral AI",
+                "isTextBased": true,
+                "isImageBased": false,
+                "isChineseSupported": false,
+                "isEnglishSupported": true,
+                "model_enable_asr": false,
+                "ryzen_ai_optimized": true
+            },
+            {
+                "name": "Llama 3.1 8B Instruct ROCm (Ryzen AI)",
+                "id": "llama_3_1_8b_instruct_rocm",
+                "hf_model_name": "meta-llama/Llama-3.1-8B-Instruct",
+                "backend": "pytorch_rocm",
+                "is_downloaded_required": true,
+                "downloaded": false,
+                "is_installation_required": false,
+                "setup_finished": false,
+                "min_gpu_memory": 8,
+                "should_show_in_UI": false,
+                "prerequisite": {
+                    "checkpoints_files": [],
+                    "checkpoints_local_dir": "llama_3_1_8b_instruct_rocm"
+                },
+                "metadata": {
+                    "max_new_tokens": 1024,
+                    "max_input_token": 4096,
+                    "temperature": 0.1
+                },
+                "model_info": "Meta Llama 3.1 8B Instruct running natively on AMD Ryzen AI via PyTorch ROCm. Optimized for Ryzen AI Max+ 395 with fp16 precision.",
+                "model_license": "https://ai.meta.com/llama/license/",
+                "model_learn_more": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
+                "model_size": "16.1GB",
+                "modelDevelopers": "Meta",
+                "isTextBased": true,
+                "isImageBased": false,
+                "isChineseSupported": false,
+                "isEnglishSupported": true,
+                "model_enable_asr": false,
+                "ryzen_ai_optimized": true
             }
         ],
         "selected": "meta/llama-3.1-8b-instruct",
@@ -407,7 +471,9 @@
                 "meta/llama-3.1-8b-instruct",
                 "mistral-nemo-12b-instruct",
                 "mistral_7b_instruct_q4_gguf",
-                "llama_3_1_8b_instruct_q4_gguf"
+                "llama_3_1_8b_instruct_q4_gguf",
+                "mistral_7b_instruct_rocm",
+                "llama_3_1_8b_instruct_rocm"
             ],
             "dataset_path": "%programdata%\\NVIDIA Corporation\\ChatRTX\\sample_data\\dataset",
             "isRelative": true,

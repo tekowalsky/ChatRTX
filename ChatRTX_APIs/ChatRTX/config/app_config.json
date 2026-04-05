@@ -11,6 +11,9 @@
     "ryzen_ai_max_plus_395": {
         "ort_genai_num_threads": 16,
         "ort_genai_execution_provider": "dml",
-        "max_batch_size": 4
+        "max_batch_size": 4,
+        "rocm_dtype": "float16",
+        "rocm_memory_fraction": 0.5,
+        "rocm_expandable_segments": true
     }
 }

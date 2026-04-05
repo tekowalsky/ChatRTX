@@ -127,11 +127,23 @@ class ChatRTXRag:
                     )
                     return True
 
+                if backend == "pytorch_rocm":
+                    from ChatRTX.rags.llama_index.rocm_api import RocmAPI
+                    self.use_nims = False
+                    model_path = os.path.join(self._model_directory, model_info["id"])
+                    self._llm = RocmAPI(
+                        model_path=model_path,
+                        temperature=model_info["metadata"].get("temperature", 0.1),
+                        max_new_tokens=model_info["metadata"].get("max_new_tokens", 1024),
+                        context_window=model_info["metadata"].get("max_input_token", 4096),
+                    )
+                    return True
+
                 # Find the model information in the internal map using the provided model_id
                 from ChatRTX.rags.llama_index.trtllm_api import TrtLlmAPI
                 from ChatRTX.inference.trtllm.utils import (read_model_name)
                 if backend != "TRTLLM":
-                    raise ValueError(f"Unsupported backend '{backend}'. Supported backends: 'TRTLLM', 'onnxrt', 'gguf', 'nims'.")
+                    raise ValueError(f"Unsupported backend '{backend}'. Supported backends: 'TRTLLM', 'onnxrt', 'gguf', 'pytorch_rocm', 'nims'.")
 
                 self.use_nims = False
                 model_path = os.path.join(self._model_directory, model_info["id"], ChatRTXRag.ENGINE_DIR)

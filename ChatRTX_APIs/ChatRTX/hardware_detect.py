@@ -23,7 +23,8 @@
 Central hardware detection module for ChatRTX.
 
 Detects whether the system has AMD Ryzen AI or NVIDIA hardware and exposes
-a consistent API used by all subsystems.
+a consistent API used by all subsystems.  Also checks for ROCm availability
+on AMD platforms so that PyTorch can be used with GPU acceleration.
 """
 
 import logging
@@ -125,6 +126,32 @@ def _detect_amd_ryzen_ai() -> Optional[Dict]:
     return None
 
 
+def _detect_rocm() -> bool:
+    """Return True when a usable ROCm installation is detected.
+
+    Checks for the ``hipconfig`` CLI (part of ROCm) and, as a fallback,
+    verifies that PyTorch was compiled with ROCm / HIP support.
+    """
+    # Quick check: hipconfig binary available?
+    if _run_cmd(["hipconfig", "--version"]) is not None:
+        return True
+
+    # Environment variable hint (set by the ROCm installer on Windows)
+    if os.environ.get("HIP_PATH") or os.environ.get("ROCM_PATH"):
+        return True
+
+    # Last resort: ask PyTorch (lazy – only imported when needed)
+    try:
+        import torch  # type: ignore
+        return hasattr(torch, "hip") or (
+            hasattr(torch.version, "hip") and torch.version.hip is not None
+        )
+    except Exception:
+        pass
+
+    return False
+
+
 # Ryzen AI Max+ 395 identifiers (substring match on detected GPU / CPU name)
 _RYZEN_AI_MAX_PLUS_395_KEYWORDS = ["Ryzen AI Max+ 395", "Ryzen AI MAX+ 395"]
 
@@ -139,7 +166,8 @@ def detect() -> dict:
         vram_mb       – VRAM in MiB (0 when unknown / shared memory)
         is_ryzen_ai   – True when AMD Ryzen AI silicon is detected
         is_ryzen_ai_max_plus_395 – True for the specific Ryzen AI Max+ 395 SKU
-        preferred_backend – "onnxrt" | "TRTLLM" | "pytorch"
+        has_rocm      – True when a usable ROCm / HIP stack is present
+        preferred_backend – "onnxrt" | "TRTLLM" | "pytorch" | "pytorch_rocm"
     """
     global _detected
     if _detected is not None:
@@ -151,15 +179,23 @@ def detect() -> dict:
     if amd is not None:
         name = amd["name"]
         is_max_plus_395 = any(kw in name for kw in _RYZEN_AI_MAX_PLUS_395_KEYWORDS)
+        rocm_available = _detect_rocm()
+        # When ROCm is available, prefer the pytorch_rocm backend for GPU-
+        # accelerated inference via PyTorch; otherwise fall back to onnxrt.
+        preferred = "pytorch_rocm" if rocm_available else "onnxrt"
         _detected = {
             "vendor": "amd",
             "gpu_name": name,
             "vram_mb": amd["vram_mb"],
             "is_ryzen_ai": True,
             "is_ryzen_ai_max_plus_395": is_max_plus_395,
-            "preferred_backend": "onnxrt",
+            "has_rocm": rocm_available,
+            "preferred_backend": preferred,
         }
-        logger.info("Detected AMD Ryzen AI hardware: %s (Max+ 395: %s)", name, is_max_plus_395)
+        logger.info(
+            "Detected AMD Ryzen AI hardware: %s (Max+ 395: %s, ROCm: %s)",
+            name, is_max_plus_395, rocm_available,
+        )
         return _detected
 
     nv = _detect_nvidia_gpu()
@@ -170,6 +206,7 @@ def detect() -> dict:
             "vram_mb": nv["vram_mb"],
             "is_ryzen_ai": False,
             "is_ryzen_ai_max_plus_395": False,
+            "has_rocm": False,
             "preferred_backend": "TRTLLM",
         }
         logger.info("Detected NVIDIA GPU: %s with %d MiB VRAM", nv["name"], nv["vram_mb"])
@@ -182,6 +219,7 @@ def detect() -> dict:
         "vram_mb": 0,
         "is_ryzen_ai": False,
         "is_ryzen_ai_max_plus_395": False,
+        "has_rocm": False,
         "preferred_backend": "pytorch",
     }
     logger.warning("No GPU accelerator detected – falling back to CPU")
@@ -225,8 +263,8 @@ def get_torch_device() -> str:
     """
     Return the best PyTorch device string for the detected hardware.
 
-    Returns "cuda" for NVIDIA, "cpu" for AMD Ryzen AI (ONNX Runtime handles
-    the NPU/iGPU acceleration outside of PyTorch), and "cpu" as fallback.
+    Returns "cuda" for NVIDIA, "hip" (mapped to torch device ``"cuda"`` when
+    using PyTorch-ROCm) for AMD with ROCm, and "cpu" as fallback.
     """
     hw = detect()
     if hw["vendor"] == "nvidia":
@@ -236,6 +274,15 @@ def get_torch_device() -> str:
                 return "cuda"
         except Exception:
             pass
-    # For AMD Ryzen AI, PyTorch operations (embeddings, CLIP) run on CPU;
-    # the heavy LLM inference is handled by ONNX Runtime GenAI with DirectML.
+    if hw["vendor"] == "amd" and hw.get("has_rocm", False):
+        try:
+            import torch
+            # PyTorch ROCm exposes HIP devices via the torch.cuda API
+            if torch.cuda.is_available():
+                return "cuda"  # ROCm uses the CUDA device name in PyTorch
+        except Exception:
+            pass
+    # For AMD Ryzen AI without ROCm, PyTorch operations (embeddings, CLIP)
+    # run on CPU; the heavy LLM inference is handled by ONNX Runtime GenAI
+    # with DirectML.
     return "cpu"

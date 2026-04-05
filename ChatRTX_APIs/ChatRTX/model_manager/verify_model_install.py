@@ -242,8 +242,9 @@ def update_config(models_dir, config_path):
                 backend = model.get('backend', '')
 
                 if on_ryzen_ai:
-                    # On Ryzen AI: show onnxrt, pytorch, and gguf models; hide TRTLLM and nims
-                    if backend in ("onnxrt", "pytorch", "gguf"):
+                    # On Ryzen AI: show onnxrt, pytorch, gguf, and pytorch_rocm models;
+                    # hide TRTLLM and nims
+                    if backend in ("onnxrt", "pytorch", "gguf", "pytorch_rocm"):
                         if min_gpu_memory > total_vid_mem:
                             model['should_show_in_UI'] = False
                         else:
@@ -262,6 +263,9 @@ def update_config(models_dir, config_path):
                         model['should_show_in_UI'] = False
                     elif backend == "onnxrt":
                         # onnxrt models are AMD-only, hide on NVIDIA
+                        model['should_show_in_UI'] = False
+                    elif backend == "pytorch_rocm":
+                        # pytorch_rocm models are AMD ROCm-only, hide on NVIDIA
                         model['should_show_in_UI'] = False
                     elif backend == "gguf":
                         # GGUF models run on both NVIDIA and AMD — always show

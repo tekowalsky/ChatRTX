@@ -161,11 +161,14 @@ class Backend:
                 if model_info.get("backend") == "nims":
                     hw = detect_hardware()
                     if hw.get("is_ryzen_ai", False):
-                        # On Ryzen AI, pick the first onnxrt or gguf model if available
+                        # On Ryzen AI, pick the first pytorch_rocm, onnxrt, or gguf model if available
                         models_info = self.model_manager.get_models_info()
+                        rocm_models = [m for m in models_info if m.get("backend") == "pytorch_rocm"]
                         onnxrt_models = [m for m in models_info if m.get("backend") == "onnxrt"]
                         gguf_models = [m for m in models_info if m.get("backend") == "gguf"]
-                        if onnxrt_models:
+                        if rocm_models and hw.get("has_rocm", False):
+                            model_id = rocm_models[0]["id"]
+                        elif onnxrt_models:
                             model_id = onnxrt_models[0]["id"]
                         elif gguf_models:
                             model_id = gguf_models[0]["id"]
@@ -468,7 +471,9 @@ class Backend:
                 model_id == "mistral-nemo-12b-instruct" or
                 model_id == "meta/llama-3.2-3b-instruct" or
                 model_id == "mistral_7b_instruct_q4_gguf" or
-                model_id == "llama_3_1_8b_instruct_q4_gguf"
+                model_id == "llama_3_1_8b_instruct_q4_gguf" or
+                model_id == "mistral_7b_instruct_rocm" or
+                model_id == "llama_3_1_8b_instruct_rocm"
             ):
                 dataset = self.config.get_config('dataset/path')
             elif model_id == "chatglm3_6b_AWQ_int4":
