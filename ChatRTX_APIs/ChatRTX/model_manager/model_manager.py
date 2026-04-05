@@ -23,7 +23,7 @@ import json
 import logging
 import os.path
 import shutil
-from ChatRTX.model_manager.model_manager_util import download_model_by_name, build_engine_by_name, verify_clip_checksum
+from ChatRTX.model_manager.model_manager_util import download_model_by_name, build_engine_by_name, verify_clip_checksum, hf_repo_id_to_model_id
 from ChatRTX.model_manager.verify_model_install import update_config
 from ChatRTX.logger import ChatRTXLogger
 from ChatRTX.model_manager.config import Config
@@ -511,14 +511,18 @@ class ModelManager:
 
             info = hf_model_info(repo_id)
 
-            model_id = repo_id.replace("/", "_")
+            model_id = hf_repo_id_to_model_id(repo_id)
 
             model_info_list = self.config.get_config('models/supported')
             if any(m['id'] == model_id for m in model_info_list):
                 self._logger.info(f"Model {repo_id} already exists in config.")
                 return True
 
-            author = getattr(info, 'author', None) or repo_id.split("/")[0] if "/" in repo_id else "Unknown"
+            author = getattr(info, 'author', None)
+            if not author and "/" in repo_id:
+                author = repo_id.split("/")[0]
+            if not author:
+                author = "Unknown"
 
             model_entry = {
                 "name": repo_id,

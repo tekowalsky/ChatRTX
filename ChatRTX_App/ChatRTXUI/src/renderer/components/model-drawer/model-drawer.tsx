@@ -240,7 +240,13 @@ export default function ModelDrawer({
 
     const onAddHfModelClick = () => {
         const trimmed = hfRepoId.trim()
-        if (!trimmed || !trimmed.includes('/')) {
+        const parts = trimmed.split('/')
+        if (
+            !trimmed ||
+            parts.length !== 2 ||
+            !parts[0] ||
+            !parts[1]
+        ) {
             setToastMessage(
                 t('hfModelInvalidId', {
                     defaultValue:

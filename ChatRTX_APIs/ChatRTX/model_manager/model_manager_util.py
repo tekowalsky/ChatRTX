@@ -294,10 +294,26 @@ def check_checkpoints_checksum(checkpoints_path, checkpoints, mode_id, checkpoin
         return False
 
 
+def hf_repo_id_to_model_id(repo_id):
+    """Converts a Hugging Face repo ID (e.g. 'owner/model') to a local model ID."""
+    return repo_id.replace("/", "_")
+
+
 def download_hf_model_snapshot(repo_id, download_path):
-    """Downloads a complete model from Hugging Face Hub using snapshot_download."""
+    """Downloads a complete model from Hugging Face Hub using snapshot_download.
+
+    Args:
+        repo_id (str): The Hugging Face repository ID in 'owner/model-name' format.
+        download_path (str): The local directory to download the model files into.
+
+    Returns:
+        bool: True if the download succeeded.
+
+    Raises:
+        Exception: If the download fails for any reason.
+    """
     from huggingface_hub import snapshot_download
-    local_dir = os.path.join(download_path, repo_id.replace("/", "_"))
+    local_dir = os.path.join(download_path, hf_repo_id_to_model_id(repo_id))
     os.makedirs(local_dir, exist_ok=True)
     snapshot_download(repo_id=repo_id, local_dir=local_dir)
     return True
