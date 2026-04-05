@@ -188,7 +188,7 @@ class RocmLlm:
                 output_ids = self._model.generate(
                     **inputs,
                     max_new_tokens=self._max_new_tokens,
-                    temperature=self._temperature if self._temperature > 0 else 1.0,
+                    temperature=max(self._temperature, 1e-7),
                     do_sample=self._temperature > 0,
                     top_k=1,
                     top_p=1.0,
@@ -230,7 +230,7 @@ class RocmLlm:
             generation_kwargs = {
                 **inputs,
                 "max_new_tokens": self._max_new_tokens,
-                "temperature": self._temperature if self._temperature > 0 else 1.0,
+                "temperature": max(self._temperature, 1e-7),
                 "do_sample": self._temperature > 0,
                 "top_k": 1,
                 "top_p": 1.0,

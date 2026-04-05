@@ -277,7 +277,10 @@ def get_torch_device() -> str:
     if hw["vendor"] == "amd" and hw.get("has_rocm", False):
         try:
             import torch
-            # PyTorch ROCm exposes HIP devices via the torch.cuda API
+            # PyTorch's ROCm build provides a CUDA-compatible API: the
+            # torch.cuda.* functions map to HIP operations under the hood,
+            # so we return "cuda" here even though the physical hardware
+            # is AMD.
             if torch.cuda.is_available():
                 return "cuda"  # ROCm uses the CUDA device name in PyTorch
         except Exception:
