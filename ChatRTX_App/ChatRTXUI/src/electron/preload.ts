@@ -26,6 +26,7 @@ import {
     DatasetSources,
     FineTuningAdvancedParams,
     FineTuningProfileConfig,
+    HfModelBackend,
     HistoryItem,
     ModelDetails,
     ModelFineTuningDetails,
@@ -107,6 +108,8 @@ export const ClientAPI = {
         ipcRenderer.invoke('downloadModel', modelId),
     installModel: (modelId: ModelId) =>
         ipcRenderer.invoke('installModel', modelId),
+    getHfCompatibleModelTypes: (): HfModelBackend[] =>
+        ipcRenderer.sendSync('getHfCompatibleModelTypes'),
     onSupportedModelsUpdated: (callback: () => void): (() => void) =>
         makeListener(SUPPORTED_MODEL_UPDATE, callback),
     onActiveModelUpdate: (callback: (modelId: ModelId) => void): (() => void) =>
@@ -127,8 +130,8 @@ export const ClientAPI = {
         makeListener(MODEL_DELETE_ERROR, callback),
     onModelDeleted: (callback: (modelId: ModelId) => void): (() => void) =>
         makeListener(MODEL_DELETED, callback),
-    addHfModel: (repoId: string) =>
-        ipcRenderer.invoke('addHfModel', repoId),
+    addHfModel: (repoId: string, backendType: HfModelBackend) =>
+        ipcRenderer.invoke('addHfModel', repoId, backendType),
     onHfModelAdded: (callback: (repoId: string) => void): (() => void) =>
         makeListener(HF_MODEL_ADDED, callback),
     onHfModelAddError: (callback: (repoId: string) => void): (() => void) =>

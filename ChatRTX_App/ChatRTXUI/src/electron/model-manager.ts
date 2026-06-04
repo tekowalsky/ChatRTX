@@ -37,7 +37,7 @@ import {
     SUPPORTED_MODEL_UPDATE,
 } from './constants'
 import Equals from './equals'
-import { ModelDetails, ModelId, ModelInfo } from './types'
+import { HfModelBackend, ModelDetails, ModelId, ModelInfo } from './types'
 
 const Events = [
     SUPPORTED_MODEL_UPDATE,
@@ -89,9 +89,14 @@ export default class ModelManager {
 
     private _supportedModels: ModelDetails[] = []
     private _isAsrModelSupported = false
+    private _hfCompatibleModelTypes: HfModelBackend[] = []
 
     get supportedModels() {
         return this._supportedModels
+    }
+
+    get hfCompatibleModelTypes() {
+        return this._hfCompatibleModelTypes
     }
 
     set supportedModels(data: ModelDetails[]) {
@@ -160,6 +165,9 @@ export default class ModelManager {
         ipcMain.on('getSupportedModels', (event) => {
             event.returnValue = this.supportedModels
         })
+        ipcMain.on('getHfCompatibleModelTypes', (event) => {
+            event.returnValue = this.hfCompatibleModelTypes
+        })
 
         ipcMain.on('isAsrModelSupported', (event) => {
             event.returnValue = this.isAsrModelSupported
@@ -177,8 +185,10 @@ export default class ModelManager {
         ipcMain.handle('installModel', (_event, id: ModelId) =>
             this.installModel(id)
         )
-        ipcMain.handle('addHfModel', (_event, repoId: string) =>
-            this.addHfModel(repoId)
+        ipcMain.handle(
+            'addHfModel',
+            (_event, repoId: string, backendType: HfModelBackend) =>
+                this.addHfModel(repoId, backendType)
         )
         this.handlePythonEvents()
     }
@@ -234,6 +244,8 @@ export default class ModelManager {
                 )
                 this.model = modelInfo.selected
                 this.isAsrModelSupported = modelInfo.enable_asr
+                this._hfCompatibleModelTypes =
+                    modelInfo.hf_supported_backends ?? []
             })
             .catch((error) => {
                 console.log('Error for getModelInfo call ', error)
@@ -305,9 +317,9 @@ export default class ModelManager {
             })
     }
 
-    private addHfModel = (repoId: string) => {
+    private addHfModel = (repoId: string, backendType: HfModelBackend) => {
         this._chatBot
-            .addHfModel(repoId)
+            .addHfModel(repoId, backendType)
             .then((value) => {
                 console.log('addHfModel call returned ', value)
             })

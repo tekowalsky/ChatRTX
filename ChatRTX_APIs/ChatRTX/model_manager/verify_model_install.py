@@ -242,13 +242,20 @@ def update_config(models_dir, config_path):
                 backend = model.get('backend', '')
 
                 if on_ryzen_ai:
-                    # On Ryzen AI: show onnxrt, pytorch, gguf, and pytorch_rocm models;
-                    # hide TRTLLM and nims
-                    if backend in ("onnxrt", "pytorch", "gguf", "pytorch_rocm"):
-                        if min_gpu_memory > total_vid_mem:
-                            model['should_show_in_UI'] = False
-                        else:
-                            model['should_show_in_UI'] = True
+                    # On Ryzen AI: show ONNX Runtime, GGUF, CLIP, and ROCm models
+                    # when supported by the local hardware; hide TRTLLM and nims.
+                    if backend == "pytorch":
+                        model['should_show_in_UI'] = (
+                            model.get("id") == "clip_model"
+                            and min_gpu_memory <= total_vid_mem
+                        )
+                    elif backend == "pytorch_rocm":
+                        model['should_show_in_UI'] = (
+                            hw.get("has_rocm", False)
+                            and min_gpu_memory <= total_vid_mem
+                        )
+                    elif backend in ("onnxrt", "gguf"):
+                        model['should_show_in_UI'] = min_gpu_memory <= total_vid_mem
                     else:
                         model['should_show_in_UI'] = False
                 else:
@@ -270,6 +277,9 @@ def update_config(models_dir, config_path):
                     elif backend == "gguf":
                         # GGUF models run on both NVIDIA and AMD — always show
                         model['should_show_in_UI'] = True
+                    elif backend == "pytorch":
+                        # Only the built-in CLIP model is supported on generic PyTorch
+                        model['should_show_in_UI'] = model.get("id") == "clip_model"
                     else:
                         model['should_show_in_UI'] = True
 

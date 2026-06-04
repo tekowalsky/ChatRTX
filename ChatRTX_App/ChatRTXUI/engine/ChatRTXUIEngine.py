@@ -269,10 +269,10 @@ class ChatBot:
                                     Events.MODEL_DELETE_ERROR, model_id)
         return True
 
-    def add_hf_model(self, repo_id, session_id):
+    def add_hf_model(self, repo_id, backend_type, session_id):
         assert self.session_id == session_id
-        self._logger.info(f"Adding HF model: {repo_id}")
-        return self._handle_with_condition(lambda: self.backend.add_hf_model(repo_id), Events.HF_MODEL_ADDED,
+        self._logger.info(f"Adding HF model: {repo_id} with backend {backend_type}")
+        return self._handle_with_condition(lambda: self.backend.add_hf_model(repo_id, backend_type), Events.HF_MODEL_ADDED,
                                     Events.HF_MODEL_ADD_ERROR, repo_id)
 
     def get_dataset_info(self, session_id):
@@ -290,7 +290,9 @@ class ChatBot:
 
     def get_model_info(self, session_id):
         assert self.session_id == session_id
-        self.model_info = self.config.get_config('models')
+        self.model_info = dict(self.config.get_config('models'))
+        backend = getattr(self, 'backend', None)
+        self.model_info['hf_supported_backends'] = backend.model_manager.get_supported_hf_backends() if backend else []
         return json.dumps(self.model_info)
     
     def get_sample_question_info(self, session_id):

@@ -35,6 +35,8 @@ export enum ModelId {
     Clip = 'clip_model',
 }
 
+export type HfModelBackend = 'onnxrt' | 'gguf' | 'pytorch_rocm'
+
 export interface ModelDetails {
     name: string
     id: ModelId
@@ -51,7 +53,7 @@ export interface ModelDetails {
     isImageBased?: boolean
     isChineseSupported?: boolean
     isEnglishSupported?: boolean
-    backend?: 'nims' | 'pytorch' | string
+    backend?: 'nims' | 'pytorch' | HfModelBackend | string
     model_enable_asr?: boolean
 }
 
@@ -90,6 +92,7 @@ export interface ModelInfo {
     supported: ModelDetails[]
     selected: ModelId
     enable_asr: boolean
+    hf_supported_backends?: HfModelBackend[]
 }
 
 export enum DataFormat {

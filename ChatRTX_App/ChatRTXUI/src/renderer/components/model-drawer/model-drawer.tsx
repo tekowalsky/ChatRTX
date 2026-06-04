@@ -25,12 +25,13 @@ import type { ClientAPI } from '../../../electron/preload'
 import { useTranslation } from 'react-i18next'
 import CustomDrawer from '../custom-drawer/custom-drawer'
 import ModelCard from '../model-card/model-card'
-import { ModelDetails, ModelId } from '../../../electron/types'
+import { HfModelBackend, ModelDetails, ModelId } from '../../../electron/types'
 import {
     Backdrop,
     Box,
     Button,
     CircularProgress,
+    MenuItem,
     Snackbar,
     Stack,
     TextField,
@@ -40,6 +41,12 @@ import { themeSettings } from '../../theme/theme'
 import CustomLoadingBackdrop from '../custom-loading-backdrop/custom-loading-backdrop'
 
 const clientAPI = (window as any).clientAPI as typeof ClientAPI
+
+const HF_MODEL_TYPE_LABELS: Record<HfModelBackend, string> = {
+    gguf: 'GGUF',
+    onnxrt: 'ONNX Runtime GenAI',
+    pytorch_rocm: 'PyTorch ROCm',
+}
 
 export default function ModelDrawer({
     openDrawer,
@@ -72,15 +79,32 @@ export default function ModelDrawer({
     const [toastMessage, setToastMessage] = useState<string>(null)
 
     const [hfRepoId, setHfRepoId] = useState<string>('')
+    const [hfCompatibleModelTypes, setHfCompatibleModelTypes] = useState<
+        HfModelBackend[]
+    >(clientAPI.getHfCompatibleModelTypes())
+    const [hfModelType, setHfModelType] = useState<HfModelBackend | null>(
+        clientAPI.getHfCompatibleModelTypes()[0] ?? null
+    )
     const [hfModelAddInProgress, setHfModelAddInProgress] =
         useState<boolean>(false)
 
     const { t } = useTranslation()
 
+    const refreshHfCompatibleModelTypes = () => {
+        const types = clientAPI.getHfCompatibleModelTypes()
+        setHfCompatibleModelTypes(types)
+        setHfModelType((currentType) =>
+            currentType && types.includes(currentType)
+                ? currentType
+                : types[0] ?? null
+        )
+    }
+
     useEffect(() => {
         const supportedModelListener = clientAPI.onSupportedModelsUpdated(
             () => {
                 setSupportedModels(clientAPI.getSupportedModels())
+                refreshHfCompatibleModelTypes()
             }
         )
 
@@ -100,6 +124,7 @@ export default function ModelDrawer({
 
         const datasetchangeListener = clientAPI.onDatasetInfoUpdate(() => {
             setSupportedModels(clientAPI.getSupportedModels())
+            refreshHfCompatibleModelTypes()
             clientAPI.resetChat()
         })
 
@@ -255,8 +280,17 @@ export default function ModelDrawer({
             )
             return
         }
+        if (!hfModelType) {
+            setToastMessage(
+                t('hfModelTypeUnavailable', {
+                    defaultValue:
+                        'No compatible Hugging Face model types are available on this hardware.',
+                })
+            )
+            return
+        }
         setHfModelAddInProgress(true)
-        clientAPI.addHfModel(trimmed)
+        clientAPI.addHfModel(trimmed, hfModelType)
     }
 
     return (
@@ -274,13 +308,63 @@ export default function ModelDrawer({
                         defaultValue: 'Add a model from Hugging Face',
                     })}
                 </Typography>
+                <Typography
+                    variant="body2"
+                    sx={{ marginBottom: '8px', color: 'rgba(255, 255, 255, 0.5)' }}
+                >
+                    {t('hfModelTypeLabel', {
+                        defaultValue: 'Compatible model types',
+                    })}
+                </Typography>
                 <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                        select
+                        size="small"
+                        value={hfModelType ?? ''}
+                        onChange={(e) =>
+                            setHfModelType(e.target.value as HfModelBackend)
+                        }
+                        disabled={
+                            hfModelAddInProgress ||
+                            hfCompatibleModelTypes.length === 0
+                        }
+                        sx={{
+                            minWidth: '220px',
+                            '& .MuiInputBase-input': {
+                                color: 'rgba(255, 255, 255, 0.9)',
+                                fontSize: '14px',
+                            },
+                            '& .MuiSvgIcon-root': {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                            },
+                            '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                },
+                                '&:hover fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.5)',
+                                },
+                                '&.Mui-focused fieldset': {
+                                    borderColor: themeSettings.colors.brand,
+                                },
+                            },
+                        }}
+                    >
+                        {hfCompatibleModelTypes.map((modelType) => (
+                            <MenuItem key={modelType} value={modelType}>
+                                {HF_MODEL_TYPE_LABELS[modelType]}
+                            </MenuItem>
+                        ))}
+                    </TextField>
                     <TextField
                         size="small"
                         placeholder="owner/model-name"
                         value={hfRepoId}
                         onChange={(e) => setHfRepoId(e.target.value)}
-                        disabled={hfModelAddInProgress}
+                        disabled={
+                            hfModelAddInProgress ||
+                            hfCompatibleModelTypes.length === 0
+                        }
                         sx={{
                             flex: 1,
                             '& .MuiInputBase-input': {
@@ -309,7 +393,11 @@ export default function ModelDrawer({
                         variant="contained"
                         size="small"
                         onClick={onAddHfModelClick}
-                        disabled={hfModelAddInProgress || !hfRepoId.trim()}
+                        disabled={
+                            hfModelAddInProgress ||
+                            !hfRepoId.trim() ||
+                            !hfModelType
+                        }
                         sx={{
                             backgroundColor: themeSettings.colors.brand,
                             textTransform: 'none',
