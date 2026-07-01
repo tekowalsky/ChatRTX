@@ -25,6 +25,7 @@ import os.path
 import shutil
 from ChatRTX.model_manager.model_manager_util import download_model_by_name, build_engine_by_name, verify_clip_checksum, hf_repo_id_to_model_id
 from ChatRTX.model_manager.verify_model_install import update_config
+from ChatRTX.hardware_detect import detect as detect_hardware
 from ChatRTX.logger import ChatRTXLogger
 from ChatRTX.model_manager.config import Config
 
@@ -37,6 +38,12 @@ class ModelManager:
     CONFIG_KEY = "models"
     SUPPORTED_KEY = "supported"
     MODEL_DIR = "model"
+    HF_BACKEND_PRIORITY = ("pytorch_rocm", "onnxrt", "gguf")
+    HF_BACKEND_LABELS = {
+        "gguf": "GGUF",
+        "onnxrt": "ONNX Runtime GenAI",
+        "pytorch_rocm": "PyTorch ROCm",
+    }
 
     def __init__(self, models_dir, config_path="../config/config.json", sample_data = "../sample_data", nim_license_dir="../NIM_licenses"):
         """
@@ -123,6 +130,65 @@ class ModelManager:
         """
         expanded_path = os.path.expandvars(path)
         return expanded_path
+
+    def get_supported_hf_backends(self):
+        """Return Hugging Face model backends supported on the current hardware."""
+        hw = detect_hardware()
+        if hw.get("vendor") == "nvidia":
+            return ["gguf"]
+        if hw.get("is_ryzen_ai", False):
+            backends = ["onnxrt", "gguf"]
+            if hw.get("has_rocm", False):
+                backends.insert(0, "pytorch_rocm")
+            return backends
+        return []
+
+    def _get_repo_file_names(self, info):
+        return [
+            sibling.rfilename
+            for sibling in getattr(info, "siblings", []) or []
+            if getattr(sibling, "rfilename", None)
+        ]
+
+    def _get_repo_supported_hf_backends(self, info):
+        file_names = self._get_repo_file_names(info)
+        lower_file_names = [name.lower() for name in file_names]
+        supported_backends = []
+        has_transformer_config = any(
+            os.path.basename(name) == "config.json" for name in lower_file_names
+        )
+        has_transformer_weights = any(
+            name.endswith(".safetensors")
+            or os.path.basename(name) in (
+                "model.safetensors.index.json",
+                "pytorch_model.bin",
+                "pytorch_model.bin.index.json",
+            )
+            for name in lower_file_names
+        )
+
+        if any(name.endswith(".gguf") for name in lower_file_names):
+            supported_backends.append("gguf")
+        if any(os.path.basename(name) == "genai_config.json" for name in lower_file_names):
+            supported_backends.append("onnxrt")
+        if has_transformer_config and has_transformer_weights:
+            supported_backends.append("pytorch_rocm")
+
+        return supported_backends
+
+    def _select_gguf_filename(self, info):
+        gguf_files = sorted(
+            name for name in self._get_repo_file_names(info) if name.lower().endswith(".gguf")
+        )
+        if not gguf_files:
+            return None
+
+        preferred_patterns = ("q4_k_m", "q4km", "q4_0", "q4")
+        for pattern in preferred_patterns:
+            for file_name in gguf_files:
+                if pattern in file_name.lower():
+                    return file_name
+        return gguf_files[0]
 
     def get_models_info(self):
         """
@@ -609,12 +675,13 @@ class ModelManager:
         self.config.write_default_config('dataset/selected_path', dataset_dir)
         return True
 
-    def add_hf_model(self, repo_id):
+    def add_hf_model(self, repo_id, backend_type=None):
         """
         Adds a Hugging Face model to the supported models configuration.
 
         Args:
             repo_id (str): The Hugging Face model repository ID (e.g., 'meta-llama/Llama-2-7b').
+            backend_type (str | None): Selected runtime backend for the model.
 
         Returns:
             bool: True if the model was added successfully, False otherwise.
@@ -623,12 +690,34 @@ class ModelManager:
             from huggingface_hub import model_info as hf_model_info
 
             info = hf_model_info(repo_id)
+            hardware_supported_backends = self.get_supported_hf_backends()
+            repo_supported_backends = self._get_repo_supported_hf_backends(info)
+            available_backends = [
+                backend
+                for backend in self.HF_BACKEND_PRIORITY
+                if backend in hardware_supported_backends and backend in repo_supported_backends
+            ]
 
-            model_id = hf_repo_id_to_model_id(repo_id)
+            if not available_backends:
+                self._logger.error(
+                    f"No supported Hugging Face model type found for {repo_id} on this hardware."
+                )
+                return False
+
+            selected_backend = backend_type or available_backends[0]
+            if selected_backend not in available_backends:
+                self._logger.error(
+                    f"Requested HF backend {selected_backend} is not compatible for {repo_id}."
+                )
+                return False
+
+            model_id = f"{hf_repo_id_to_model_id(repo_id)}__{selected_backend}"
 
             model_info_list = self.config.get_config('models/supported')
             if any(m['id'] == model_id for m in model_info_list):
-                self._logger.info(f"Model {repo_id} already exists in config.")
+                self._logger.info(
+                    f"Model {repo_id} with backend {selected_backend} already exists in config."
+                )
                 return True
 
             author = getattr(info, 'author', None)
@@ -637,11 +726,17 @@ class ModelManager:
             if not author:
                 author = "Unknown"
 
+            gguf_filename = self._select_gguf_filename(info) if selected_backend == "gguf" else None
+            display_name = f"{repo_id} ({self.HF_BACKEND_LABELS[selected_backend]})"
+            model_description = (
+                f"Hugging Face model: {repo_id} using {self.HF_BACKEND_LABELS[selected_backend]}"
+            )
+
             model_entry = {
-                "name": repo_id,
+                "name": display_name,
                 "id": model_id,
                 "hf_model_name": repo_id,
-                "backend": "pytorch",
+                "backend": selected_backend,
                 "is_downloaded_required": True,
                 "downloaded": False,
                 "is_installation_required": False,
@@ -653,7 +748,7 @@ class ModelManager:
                     "checkpoints_local_dir": model_id
                 },
                 "metadata": {},
-                "model_info": f"Hugging Face model: {repo_id}",
+                "model_info": model_description,
                 "model_license": f"https://huggingface.co/{repo_id}",
                 "model_learn_more": f"https://huggingface.co/{repo_id}",
                 "model_size": "Unknown",
@@ -665,9 +760,14 @@ class ModelManager:
                 "model_enable_asr": False
             }
 
+            if gguf_filename:
+                model_entry["gguf_filename"] = gguf_filename
+
             model_info_list.append(model_entry)
             self.config.write_default_config('models/supported', model_info_list)
-            self._logger.info(f"Successfully added HF model {repo_id} to config.")
+            self._logger.info(
+                f"Successfully added HF model {repo_id} to config with backend {selected_backend}."
+            )
             return True
         except Exception as e:
             self._logger.error(f"Failed to add HF model {repo_id}. Error: {str(e)}")

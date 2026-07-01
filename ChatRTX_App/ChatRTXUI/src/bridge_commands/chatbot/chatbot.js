@@ -162,6 +162,10 @@ async function initializeChatbot(isPackaged) {
             return await this.parent.delete_model(model_id, session_id)
         }
 
+        async addHfModel(repoId, backendType) {
+            return await this.parent.add_hf_model(repoId, backendType, session_id)
+        }
+
         async getConfig(key) {
             return await this.parent.get_config(key, session_id)
         }
@@ -250,6 +254,7 @@ async function initializeChatbot(isPackaged) {
         downloadModel: chatbotObj.downloadModel,
         installModel: chatbotObj.installModel,
         deleteModel: chatbotObj.deleteModel,
+        addHfModel: chatbotObj.addHfModel,
         getConfig: chatbotObj.getConfig,
         setConfig: chatbotObj.setConfig,
         listenPythonEvents: listenPythonEvents,

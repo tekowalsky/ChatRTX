@@ -465,24 +465,7 @@ class Backend:
                 raise ValueError(f"Invalid mode: {self.chatrtx_mode}. Mode must be either 'AI' or 'RAG'.")
 
         if status == True:
-            if (
-                model_id == "mistral_7b_AWQ_int4_chat" or
-                model_id == "llama2_13b_AWQ_INT4_chat" or
-                model_id == "gemma_7b_int4" or
-                model_id == "meta/llama-3.1-8b-instruct" or
-                model_id == "mistral-nemo-12b-instruct" or
-                model_id == "meta/llama-3.2-3b-instruct" or
-                model_id == "mistral_7b_instruct_q4_gguf" or
-                model_id == "llama_3_1_8b_instruct_q4_gguf" or
-                model_id == "mistral_7b_instruct_rocm" or
-                model_id == "llama_3_1_8b_instruct_rocm"
-            ):
-                dataset = self.config.get_config('dataset/path')
-            elif model_id == "chatglm3_6b_AWQ_int4":
-                dataset = self.config.get_config('dataset/path_chinese')
-            elif model_id == "clip_model":
-                dataset = self.config.get_config('dataset/path_clip')
-
+            dataset = self._get_default_dataset_for_model(model_id)
             dataset = self.config.expand_programdata_path(dataset)
             status = self.set_dataset_path(dataset)
 
@@ -493,10 +476,21 @@ class Backend:
         self._logger.info(f"Delete model return {status}")
         return status
 
-    def add_hf_model(self, repo_id):
-        status = self.model_manager.add_hf_model(repo_id)
-        self._logger.info(f"Add HF model {repo_id} returned {status}")
+    def add_hf_model(self, repo_id, backend_type):
+        status = self.model_manager.add_hf_model(repo_id, backend_type)
+        self._logger.info(f"Add HF model {repo_id} with backend {backend_type} returned {status}")
         return status
+
+    def _get_default_dataset_for_model(self, model_id):
+        model_info = self.model_manager.get_model_info(model_id)
+        if model_info is None:
+            return self.config.get_config('dataset/path')
+
+        if model_info.get("isImageBased", False):
+            return self.config.get_config('dataset/path_clip')
+        if model_info.get("isChineseSupported", False):
+            return self.config.get_config('dataset/path_chinese')
+        return self.config.get_config('dataset/path')
 
     def set_active_model(self, model_id):
         try:
